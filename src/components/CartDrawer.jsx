@@ -25,17 +25,27 @@ export const CartDrawer = ({
   currency = '₦',
   serviceChargeDineIn = 500,
   packagingFeeGoBites = 300,
+  prefilledTable = '',
 }) => {
   const isDineIn = activeMode === 'dinein';
 
   // Customer Details Form State
   const [customerInfo, setCustomerInfo] = useState({
     name: '',
-    tableNumber: '',
+    tableNumber: prefilledTable || '',
     phone: '',
     location: '',
     specialInstructions: '',
   });
+
+  React.useEffect(() => {
+    if (prefilledTable) {
+      setCustomerInfo((prev) => ({
+        ...prev,
+        tableNumber: prev.tableNumber || prefilledTable,
+      }));
+    }
+  }, [prefilledTable]);
 
   const [formError, setFormError] = useState('');
 

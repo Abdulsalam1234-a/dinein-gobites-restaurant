@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
-import { SplashScreen } from './components/SplashScreen';
-import { HeroBanner } from './components/HeroBanner';
-import { DineInMenu } from './components/DineInMenu';
-import { GoBitesMenu } from './components/GoBitesMenu';
+import { HeroSection } from './components/HeroSection';
+import { BookTableBar } from './components/BookTableBar';
+import { PopularDishesSection } from './components/PopularDishesSection';
+import { RegularMenuSection } from './components/RegularMenuSection';
+import { MobileAppPromo } from './components/MobileAppPromo';
 import { OutletsSection } from './components/OutletsSection';
 import { FAQSection } from './components/FAQSection';
 import { CartDrawer } from './components/CartDrawer';
@@ -29,6 +30,9 @@ export default function App() {
   // 2. Active Mode: 'dinein' | 'gobites'
   const [activeMode, setActiveMode] = useState('dinein');
 
+  // Pre-selected table state from booking bar
+  const [prefilledTable, setPrefilledTable] = useState('Table 1');
+
   // 3. Cart State: Array of items
   const [cart, setCart] = useState(() => {
     try {
@@ -53,20 +57,18 @@ export default function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [orderModalData, setOrderModalData] = useState(null);
 
-  // 5. Search & Filters
+  // 5. Search
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
 
-  // Mode change handler that safely resets category
+  // Mode change handler
   const handleModeChange = (mode, shouldScroll = true) => {
     setActiveMode(mode);
-    setSelectedCategory('all');
     if (shouldScroll) {
-      scrollToSection('menu');
+      scrollToSection('regular-menu');
     }
   };
 
-  // 6. Navigation helper
+  // Navigation helper
   const scrollToSection = (sectionId) => {
     if (sectionId === 'hero') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -78,70 +80,7 @@ export default function App() {
     }
   };
 
-  // 7. Categories for Active Mode
-  const categories = useMemo(() => {
-    if (activeMode === 'dinein') {
-      return [
-        { id: 'all', name: 'All Dine-In Dishes', icon: '🍽️' },
-        { id: 'swallow', name: 'Swallows & Soups', icon: '🥣' },
-        { id: 'rice', name: 'Plates of Jollof & Ofada', icon: '🍛' },
-        { id: 'spaghetti', name: 'Spaghetti & Pastas', icon: '🍝' },
-        { id: 'catfish', name: 'Fresh Catfish Specials', icon: '🐟' },
-        { id: 'panla', name: 'Crispy Panla Fish', icon: '🎣' },
-        { id: 'protein', name: 'Beef, Chicken & Asun', icon: '🥩' },
-        { id: 'plantain', name: 'Sweet Dodo & Gizdodo', icon: '🍌' },
-      ];
-    } else {
-      // Go Bites Mode: STRICTLY NO SWALLOWS
-      return [
-        { id: 'all', name: 'All Go Bites', icon: '⚡' },
-        { id: 'combo', name: 'Value Combos', icon: '📦' },
-        { id: 'rice', name: 'Express Rice Boxes', icon: '🍛' },
-        { id: 'spaghetti', name: 'Jollof Spaghetti', icon: '🍝' },
-        { id: 'moimoi', name: 'Gourmet Moi Moi', icon: '🫔' },
-        { id: 'snack', name: 'Pastries & Snacks', icon: '🥟' },
-      ];
-    }
-  }, [activeMode]);
-
-  // 8. Filtered Items
-  const filteredItems = useMemo(() => {
-    return menuItems.filter((item) => {
-      // Mode Check:
-      // DineIn accepts 'dinein' and 'both'
-      // Go Bites accepts 'gobites' and 'both' BUT STRICTLY EXCLUDES 'swallow'!
-      if (activeMode === 'dinein') {
-        if (item.channel !== 'dinein' && item.channel !== 'both') return false;
-      } else {
-        if (item.category === 'swallow') return false; // Rule: strictly NO swallows in Go Bites
-        if (item.channel !== 'gobites' && item.channel !== 'both') return false;
-      }
-
-      // Category Filter
-      if (selectedCategory !== 'all') {
-        if (selectedCategory === 'catfish') {
-          if (item.category !== 'catfish') return false;
-        } else if (selectedCategory === 'panla') {
-          if (item.category !== 'panla') return false;
-        } else if (item.category !== selectedCategory) {
-          return false;
-        }
-      }
-
-      // Search Query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesName = item.name.toLowerCase().includes(q);
-        const matchesDesc = item.description.toLowerCase().includes(q);
-        const matchesCategory = item.category.toLowerCase().includes(q);
-        return matchesName || matchesDesc || matchesCategory;
-      }
-
-      return true;
-    });
-  }, [menuItems, activeMode, selectedCategory, searchQuery]);
-
-  // 9. Cart Actions
+  // 6. Cart Actions
   const handleAddToCart = (item) => {
     setCart((prev) => {
       const existingIndex = prev.findIndex(
@@ -178,7 +117,7 @@ export default function App() {
   const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
   const cartTotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
-  // 10. WhatsApp Checkout Action
+  // 7. WhatsApp Checkout Action
   const handleProceedToWhatsApp = ({ cart, mode, customerInfo, totals }) => {
     const compiled = compileWhatsAppOrder({
       cart,
@@ -196,7 +135,7 @@ export default function App() {
     setIsCartOpen(false);
   };
 
-  // 11. Admin Updates
+  // 8. Admin Updates
   const handleUpdateMenuItems = (newItems) => {
     setMenuItems(newItems);
     saveMenuToStorage(newItems);
@@ -213,10 +152,20 @@ export default function App() {
     setSettings(defaultSettings);
   };
 
+  // Filtered Items for search if applicable
+  const displayItems = searchQuery.trim()
+    ? menuItems.filter((item) => {
+        const q = searchQuery.toLowerCase();
+        return item.name.toLowerCase().includes(q) || 
+               item.description.toLowerCase().includes(q) || 
+               item.category.toLowerCase().includes(q);
+      })
+    : menuItems;
+
   return (
-    <div className="min-h-screen bg-navy-950 text-slate-100 flex flex-col font-sans selection:bg-gold selection:text-navy-950">
+    <div className="min-h-screen bg-[#F4F6F9] text-slate-800 flex flex-col font-sans selection:bg-mustard selection:text-petrol-950">
       
-      {/* 1. Header Navigation */}
+      {/* 1. Header Navigation - Matching top of reference image */}
       <Navbar
         activeMode={activeMode}
         setActiveMode={handleModeChange}
@@ -231,66 +180,65 @@ export default function App() {
         onNavigateSection={scrollToSection}
       />
 
-      {/* Main Content Area */}
       <main className="flex-1">
         
-        {/* 2. Welcome Splash Screen */}
-        <SplashScreen
-          onSelectMode={handleModeChange}
-          onExploreOverview={() => scrollToSection('outlets')}
+        {/* 2. Hero Section: "We serve the taste you love" with curved bottom & concentric halo circular plate */}
+        <HeroSection
+          onExploreFood={() => scrollToSection('regular-menu')}
+          onOpenWhatsAppGuide={() => scrollToSection('mobile-promo')}
         />
 
-        {/* 3. Menu Section with Interactive Hero Banner */}
-        <div id="menu" className="scroll-mt-20">
-          <HeroBanner
-            activeMode={activeMode}
-            setActiveMode={handleModeChange}
-            categories={categories}
-            selectedCategory={selectedCategory}
-            setSelectedCategory={setSelectedCategory}
-            itemCount={filteredItems.length}
-          />
+        {/* 3. Floating Overlapping "Book A Table & Seated Orders" card */}
+        <BookTableBar
+          activeMode={activeMode}
+          setActiveMode={handleModeChange}
+          onSelectTable={(table) => setPrefilledTable(table)}
+          onExploreMenu={() => scrollToSection('regular-menu')}
+        />
 
-          {/* Conditional Menu Rendering based on Mode */}
-          {activeMode === 'dinein' ? (
-            <DineInMenu
-              items={filteredItems}
-              cart={cart}
-              onAddToCart={handleAddToCart}
-              onUpdateCartQuantity={handleUpdateCartQuantity}
-              currency={settings.currency}
-            />
-          ) : (
-            <GoBitesMenu
-              items={filteredItems}
-              cart={cart}
-              onAddToCart={handleAddToCart}
-              onUpdateCartQuantity={handleUpdateCartQuantity}
-              currency={settings.currency}
-            />
-          )}
+        {/* 4. "Our Popular Dishes" - 3 Circular plate cards with carousel arrows */}
+        <PopularDishesSection
+          items={displayItems}
+          onAddToCart={handleAddToCart}
+          currency={settings.currency}
+        />
+
+        {/* 5. "Our Regular Menu" - Two panoramic photos & two-column dotted leader menu list */}
+        <RegularMenuSection
+          menuItems={displayItems}
+          activeMode={activeMode}
+          setActiveMode={handleModeChange}
+          onAddToCart={handleAddToCart}
+          currency={settings.currency}
+        />
+
+        {/* 6. "Download Our Mobile App / Order on WhatsApp" Yellow Promo Card & Smartphone Mockup */}
+        <div id="mobile-promo">
+          <MobileAppPromo 
+            whatsappNumber={settings.whatsappNumber} 
+          />
         </div>
 
-        {/* 4. Branches & Outlets Section */}
+        {/* 7. Outlets & Physical Branches Section */}
         <OutletsSection 
           whatsappNumber={settings.whatsappNumber} 
         />
 
-        {/* 5. Frequently Asked Questions Section */}
+        {/* 8. Frequently Asked Questions Section */}
         <FAQSection 
           whatsappNumber={settings.whatsappNumber} 
         />
 
       </main>
 
-      {/* 6. Footer */}
+      {/* 9. Dark Slate/Navy Footer with Newsletter & Instagram Photos Grid */}
       <Footer
         onNavigateSection={scrollToSection}
         onOpenAdmin={() => setIsAdminOpen(true)}
         whatsappNumber={settings.whatsappNumber}
       />
 
-      {/* 7. Slide-over Cart Drawer */}
+      {/* Slide-over Cart Drawer */}
       <CartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
@@ -304,16 +252,17 @@ export default function App() {
         currency={settings.currency}
         serviceChargeDineIn={settings.serviceChargeDineIn}
         packagingFeeGoBites={settings.packagingFeeGoBites}
+        prefilledTable={prefilledTable}
       />
 
-      {/* 8. WhatsApp Order Confirmation Modal */}
+      {/* WhatsApp Order Confirmation Modal */}
       <WhatsAppOrderModal
         isOpen={Boolean(orderModalData)}
         onClose={() => setOrderModalData(null)}
         orderDetails={orderModalData}
       />
 
-      {/* 9. Admin Dashboard Modal */}
+      {/* Admin Dashboard Modal */}
       <AdminDashboard
         isOpen={isAdminOpen}
         onClose={() => setIsAdminOpen(false)}
@@ -325,7 +274,7 @@ export default function App() {
         currency={settings.currency}
       />
 
-      {/* 10. Floating Interactive Concierge Bot */}
+      {/* Floating Interactive Concierge Bot */}
       <ChatbotWidget
         _activeMode={activeMode}
         setActiveMode={handleModeChange}

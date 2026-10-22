@@ -6,10 +6,7 @@ import {
   Lock, 
   MessageCircle, 
   Menu as MenuIcon, 
-  X, 
-  Sparkles,
-  MapPin,
-  HelpCircle
+  X
 } from 'lucide-react';
 
 export const Navbar = ({
@@ -22,91 +19,92 @@ export const Navbar = ({
   searchQuery,
   setSearchQuery,
   currency = '₦',
-  whatsappNumber = '2348012345678',
+  whatsappNumber = '07068371295',
   onNavigateSection,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSearchInput, setShowSearchInput] = useState(false);
 
   const cleanPhone = whatsappNumber.replace(/[^0-9]/g, '');
-  const directWhatsAppUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent("Hello Royal Gold Eatery! I'd like to make an inquiry.")}`;
+  const directWhatsAppUrl = `https://wa.me/${cleanPhone.startsWith('0') ? '234' + cleanPhone.slice(1) : cleanPhone}?text=${encodeURIComponent("Hello ROMEE Go-Bite Eatery! I'd like to make an inquiry.")}`;
 
   return (
-    <header className="sticky top-0 z-40 bg-navy-950/85 backdrop-blur-md border-b border-gold/20 transition-all duration-300">
+    <header className="bg-petrol-900 border-b border-petrol-800/80 sticky top-0 z-40 text-white transition-all">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           
-          {/* Brand Logo & Crest */}
+          {/* Brand Logo - Styled like Foodel in screenshot */}
           <div 
             onClick={() => onNavigateSection('hero')} 
-            className="flex items-center gap-3 cursor-pointer group select-none"
+            className="flex items-center gap-2.5 cursor-pointer select-none group"
           >
-            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-gold-400 via-gold to-gold-600 p-[2px] shadow-gold-sm transition-transform duration-300 group-hover:scale-105">
-              <div className="w-full h-full rounded-full bg-navy-950 flex items-center justify-center">
-                <UtensilsCrossed className="w-5 h-5 text-gold transition-colors duration-300 group-hover:text-gold-300" />
-              </div>
+            <div className="w-9 h-9 rounded-full bg-mustard flex items-center justify-center text-petrol-950 font-black shadow-md">
+              <UtensilsCrossed className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-serif text-xl sm:text-2xl font-bold tracking-tight text-white group-hover:text-gold-200 transition-colors">
-                  ROMEE
-                </span>
-                <span className="text-[10px] uppercase font-bold tracking-widest text-gold bg-gold/10 px-1.5 py-0.5 rounded border border-gold/30">
-                  Go-Bite Eatery
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 tracking-wider uppercase font-medium">
-                Dine-In Lounge & Express Bites
-              </p>
+            <div className="flex items-baseline gap-1">
+              <span className="font-serif text-2xl font-bold tracking-tight text-white">
+                ROMEE
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-mustard bg-petrol-950/60 px-2 py-0.5 rounded-full border border-mustard/30">
+                Go-Bite
+              </span>
             </div>
           </div>
 
-          {/* Center Mode Switcher: DINE-IN vs GO BITES */}
-          <div className="hidden md:flex items-center bg-navy-900/90 p-1.5 rounded-full border border-gold/30 shadow-inner">
+          {/* Center Navigation Links - Styled like reference image */}
+          <nav className="hidden md:flex items-center gap-7 text-xs font-semibold tracking-wide">
             <button
-              onClick={() => setActiveMode('dinein')}
-              className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all duration-300 ${
-                activeMode === 'dinein'
-                  ? 'bg-gradient-to-r from-gold to-gold-600 text-navy-950 shadow-gold-sm font-bold scale-[1.02]'
-                  : 'text-slate-300 hover:text-gold hover:bg-navy-800/50'
-              }`}
+              onClick={() => onNavigateSection('hero')}
+              className="text-white hover:text-mustard transition-colors"
             >
-              <UtensilsCrossed className="w-3.5 h-3.5" />
-              <span>DINE-IN LOUNGE</span>
-              {activeMode === 'dinein' && (
-                <span className="w-1.5 h-1.5 rounded-full bg-navy-950 animate-pulse"></span>
-              )}
+              Home
             </button>
-
             <button
-              onClick={() => setActiveMode('gobites')}
-              className={`flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold tracking-wide transition-all duration-300 ${
-                activeMode === 'gobites'
-                  ? 'bg-gradient-to-r from-gold to-gold-600 text-navy-950 shadow-gold-sm font-bold scale-[1.02]'
-                  : 'text-slate-300 hover:text-gold hover:bg-navy-800/50'
-              }`}
+              onClick={() => onNavigateSection('popular')}
+              className="text-slate-200 hover:text-mustard transition-colors"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>GO BITES EXPRESS</span>
-              {activeMode === 'gobites' && (
-                <span className="w-1.5 h-1.5 rounded-full bg-navy-950 animate-pulse"></span>
-              )}
+              Popular Dishes
             </button>
-          </div>
+            <button
+              onClick={() => onNavigateSection('book-table')}
+              className="text-slate-200 hover:text-mustard transition-colors"
+            >
+              Reservation / Table
+            </button>
+            <button
+              onClick={() => onNavigateSection('regular-menu')}
+              className="text-slate-200 hover:text-mustard transition-colors flex items-center gap-1.5"
+            >
+              <span>Our Menu</span>
+              <span className="w-2 h-2 rounded-full bg-mustard"></span>
+            </button>
+            <button
+              onClick={() => onNavigateSection('outlets')}
+              className="text-slate-200 hover:text-mustard transition-colors"
+            >
+              Branches
+            </button>
+            <button
+              onClick={() => onNavigateSection('faqs')}
+              className="text-slate-200 hover:text-mustard transition-colors"
+            >
+              FAQs
+            </button>
+          </nav>
 
-          {/* Right Action Icons: Search, Cart, WhatsApp, Admin */}
-          <div className="flex items-center gap-2.5 sm:gap-4">
+          {/* Right Action Icons: Search, WhatsApp Contact Us, Cart, Admin */}
+          <div className="flex items-center gap-3">
             
             {/* Search Input on Desktop */}
-            <div className="relative hidden lg:block w-48 xl:w-60">
+            <div className="relative hidden lg:block w-44">
               <input
                 type="text"
-                placeholder={`Search ${activeMode === 'dinein' ? 'swallows, fish, rice...' : 'combos, snacks, moi moi...'}`}
+                placeholder="Search food..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-navy-900/80 border border-gold/25 rounded-full py-1.5 pl-9 pr-3 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all"
+                className="w-full bg-petrol-950/70 border border-petrol-700 rounded-full py-1.5 pl-8 pr-3 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-mustard transition-all"
               />
-              <Search className="w-4 h-4 text-gold/70 absolute left-3 top-2.5 pointer-events-none" />
+              <Search className="w-3.5 h-3.5 text-slate-300 absolute left-2.5 top-2.5 pointer-events-none" />
               {searchQuery && (
                 <button 
                   onClick={() => setSearchQuery('')}
@@ -120,40 +118,34 @@ export const Navbar = ({
             {/* Mobile Search Toggle */}
             <button
               onClick={() => setShowSearchInput(!showSearchInput)}
-              className="lg:hidden p-2 text-slate-300 hover:text-gold transition-colors"
+              className="lg:hidden p-2 text-slate-200 hover:text-mustard"
               title="Search menu"
             >
-              <Search className="w-5 h-5" />
+              <Search className="w-4 h-4" />
             </button>
 
-            {/* WhatsApp Quick Link */}
+            {/* Contact Us / WhatsApp Pill Button matching screenshot */}
             <a
               href={directWhatsAppUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/40 text-emerald-400 text-xs font-medium hover:bg-emerald-900/40 transition-colors"
-              title="Chat with Reception"
+              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-300/40 hover:border-mustard text-xs font-semibold hover:text-mustard transition-colors"
             >
-              <MessageCircle className="w-3.5 h-3.5 fill-emerald-400/20" />
-              <span>WhatsApp</span>
+              <MessageCircle className="w-3.5 h-3.5 text-mustard" />
+              <span>Contact us</span>
             </a>
 
             {/* Shopping Plate / Bag Button */}
             <button
               onClick={onOpenCart}
-              className="relative flex items-center gap-2.5 bg-gradient-to-r from-gold-500/20 to-gold/30 hover:from-gold-500/30 hover:to-gold/40 border border-gold/40 px-3.5 sm:px-4 py-2 rounded-full text-gold-300 font-semibold transition-all duration-300 hover:shadow-gold-sm hover:scale-[1.03]"
+              className="relative flex items-center gap-2 bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold px-3.5 sm:px-4 py-2 rounded-full text-xs shadow-md transition-all hover:scale-105"
             >
-              <ShoppingBag className="w-4 h-4 text-gold" />
-              <div className="hidden sm:flex flex-col items-start leading-none">
-                <span className="text-[10px] text-slate-300 uppercase tracking-wider font-semibold">
-                  {activeMode === 'dinein' ? 'Your Plate' : 'Your Bag'}
-                </span>
-                <span className="text-xs font-bold text-gold-200">
-                  {currency}{cartTotal.toLocaleString()}
-                </span>
-              </div>
+              <ShoppingBag className="w-4 h-4" />
+              <span className="hidden sm:inline font-bold">
+                {currency}{cartTotal.toLocaleString()}
+              </span>
               {cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-red-600 to-amber-600 text-white text-[11px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg animate-bounce">
+                <span className="w-5 h-5 rounded-full bg-petrol-950 text-white text-[10px] font-black flex items-center justify-center -ml-0.5">
                   {cartCount}
                 </span>
               )}
@@ -162,7 +154,7 @@ export const Navbar = ({
             {/* Admin Portal Button */}
             <button
               onClick={onOpenAdmin}
-              className="p-2 text-slate-400 hover:text-gold hover:bg-navy-900/60 rounded-full border border-transparent hover:border-gold/20 transition-all"
+              className="p-2 text-slate-300 hover:text-mustard hover:bg-petrol-800 rounded-full transition-all"
               title="Admin & Pricing Dashboard"
             >
               <Lock className="w-4 h-4" />
@@ -171,7 +163,7 @@ export const Navbar = ({
             {/* Mobile Hamburger */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-slate-300 hover:text-gold focus:outline-none"
+              className="md:hidden p-2 text-white hover:text-mustard focus:outline-none"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <MenuIcon className="w-6 h-6" />}
             </button>
@@ -184,104 +176,84 @@ export const Navbar = ({
             <div className="relative">
               <input
                 type="text"
-                placeholder={`Search ${activeMode === 'dinein' ? 'swallows, catfish, rice...' : 'combos, snacks...'}`}
+                placeholder="Search swallows, rice, combos..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-navy-900 border border-gold/40 rounded-full py-2 pl-10 pr-4 text-xs text-white placeholder-slate-400 focus:outline-none"
+                className="w-full bg-petrol-950 border border-petrol-700 rounded-full py-2 pl-9 pr-4 text-xs text-white placeholder-slate-400 focus:outline-none"
                 autoFocus
               />
-              <Search className="w-4 h-4 text-gold absolute left-3.5 top-2.5 pointer-events-none" />
+              <Search className="w-4 h-4 text-mustard absolute left-3 top-2.5 pointer-events-none" />
             </div>
           </div>
         )}
 
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-gold/20 bg-navy-950/95 backdrop-blur-xl animate-in slide-in-from-top-2">
-            
-            {/* Mode Toggle on Mobile */}
-            <div className="grid grid-cols-2 gap-2 p-1.5 bg-navy-900 rounded-xl mb-4 border border-gold/30">
-              <button
-                onClick={() => {
-                  setActiveMode('dinein');
-                  setMobileMenuOpen(false);
-                }}
-                className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${
-                  activeMode === 'dinein'
-                    ? 'bg-gold text-navy-950 shadow-gold-sm'
-                    : 'text-slate-300'
-                }`}
-              >
-                <UtensilsCrossed className="w-3.5 h-3.5" />
-                <span>Dine-In Lounge</span>
-              </button>
-              <button
-                onClick={() => {
-                  setActiveMode('gobites');
-                  setMobileMenuOpen(false);
-                }}
-                className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${
-                  activeMode === 'gobites'
-                    ? 'bg-gold text-navy-950 shadow-gold-sm'
-                    : 'text-slate-300'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Go Bites Express</span>
-              </button>
-            </div>
-
-            <div className="space-y-2 text-sm">
-              <button
-                onClick={() => {
-                  onNavigateSection('menu');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 text-slate-200 hover:text-gold hover:bg-navy-900 rounded-lg flex items-center justify-between"
-              >
-                <span>Explore Full Menu</span>
-                <span className="text-xs text-gold capitalize">{activeMode}</span>
-              </button>
-              <button
-                onClick={() => {
-                  onNavigateSection('outlets');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 text-slate-200 hover:text-gold hover:bg-navy-900 rounded-lg flex items-center gap-2"
-              >
-                <MapPin className="w-4 h-4 text-gold" />
-                <span>Our Outlets & Branches</span>
-              </button>
-              <button
-                onClick={() => {
-                  onNavigateSection('faqs');
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 text-slate-200 hover:text-gold hover:bg-navy-900 rounded-lg flex items-center gap-2"
-              >
-                <HelpCircle className="w-4 h-4 text-gold" />
-                <span>Frequently Asked Questions</span>
-              </button>
-              <a
-                href={directWhatsAppUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full text-left px-3 py-2 text-emerald-400 hover:bg-emerald-950/40 rounded-lg flex items-center gap-2"
-              >
-                <MessageCircle className="w-4 h-4" />
-                <span>Chat with Manager on WhatsApp</span>
-              </a>
-              <button
-                onClick={() => {
-                  onOpenAdmin();
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full text-left px-3 py-2 text-gold/80 hover:text-gold hover:bg-navy-900 rounded-lg flex items-center gap-2 border-t border-gold/10 pt-3"
-              >
-                <Lock className="w-4 h-4" />
-                <span>Admin & Product Pricing</span>
-              </button>
-            </div>
+          <div className="md:hidden py-4 border-t border-petrol-800 bg-petrol-950 text-xs space-y-2">
+            <button
+              onClick={() => {
+                onNavigateSection('popular');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 text-slate-200 hover:text-mustard rounded-lg"
+            >
+              Popular Dishes
+            </button>
+            <button
+              onClick={() => {
+                onNavigateSection('book-table');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 text-slate-200 hover:text-mustard rounded-lg"
+            >
+              Book A Table / Seated Order
+            </button>
+            <button
+              onClick={() => {
+                onNavigateSection('regular-menu');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 text-slate-200 hover:text-mustard rounded-lg"
+            >
+              Our Regular Menu
+            </button>
+            <button
+              onClick={() => {
+                onNavigateSection('outlets');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 text-slate-200 hover:text-mustard rounded-lg"
+            >
+              Our Outlets & Branches
+            </button>
+            <button
+              onClick={() => {
+                onNavigateSection('faqs');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 text-slate-200 hover:text-mustard rounded-lg"
+            >
+              FAQs
+            </button>
+            <a
+              href={directWhatsAppUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full text-left px-3 py-2 text-emerald-400 hover:bg-petrol-900 rounded-lg flex items-center gap-2"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>WhatsApp Us: 07068371295</span>
+            </a>
+            <button
+              onClick={() => {
+                onOpenAdmin();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 text-mustard hover:bg-petrol-900 rounded-lg flex items-center gap-2 border-t border-petrol-800 pt-3"
+            >
+              <Lock className="w-4 h-4" />
+              <span>Admin Management</span>
+            </button>
           </div>
         )}
       </div>
