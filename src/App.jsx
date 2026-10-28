@@ -28,16 +28,23 @@ import {
   saveStaffToStorage,
   loadAmbienceFromStorage,
   saveAmbienceToStorage,
+  loadUsersFromStorage,
+  saveUsersToStorage,
+  loadAuditLogsFromStorage,
+  saveAuditLogsToStorage,
+  addAuditLog,
   resetStorageToDefaults 
 } from './utils/storage';
 import { compileWhatsAppOrder } from './utils/whatsapp';
 
 export default function App() {
-  // 1. Persistent State: Menu, Staff, Ambience Media, Settings
+  // 1. Persistent State: Menu, Staff, Ambience Media, Settings, Users, Audit Logs
   const [menuItems, setMenuItems] = useState(loadMenuFromStorage);
   const [settings, setSettings] = useState(loadSettingsFromStorage);
   const [staffMembers, setStaffMembers] = useState(loadStaffFromStorage);
   const [ambienceMedia, setAmbienceMedia] = useState(loadAmbienceFromStorage);
+  const [users, setUsers] = useState(loadUsersFromStorage);
+  const [auditLogs, setAuditLogs] = useState(loadAuditLogsFromStorage);
 
   // 2. Active Dining Mode: 'dinein' | 'gobites'
   const [activeMode, setActiveMode] = useState('dinein');
@@ -148,12 +155,37 @@ export default function App() {
     saveAmbienceToStorage(newAmbience);
   };
 
+  const handleUpdateUsers = (newUsers) => {
+    setUsers(newUsers);
+    saveUsersToStorage(newUsers);
+  };
+
+  const handleAddAuditLog = (action, details, user) => {
+    const { updatedLogs, newEntry } = addAuditLog(action, details, user);
+    setAuditLogs(updatedLogs);
+    return newEntry;
+  };
+
+  const handleClearAuditLogs = () => {
+    setAuditLogs([]);
+    saveAuditLogsToStorage([]);
+  };
+
   const handleResetDefaults = () => {
-    const { menu: defaultMenu, settings: defaultSettings, staff: defaultStaff, ambience: defaultAmbience } = resetStorageToDefaults();
+    const { 
+      menu: defaultMenu, 
+      settings: defaultSettings, 
+      staff: defaultStaff, 
+      ambience: defaultAmbience,
+      users: defaultUsers,
+      auditLogs: defaultLogs
+    } = resetStorageToDefaults();
     setMenuItems(defaultMenu);
     setSettings(defaultSettings);
     setStaffMembers(defaultStaff);
     setAmbienceMedia(defaultAmbience);
+    setUsers(defaultUsers);
+    setAuditLogs(defaultLogs);
   };
 
   return (
@@ -296,6 +328,11 @@ export default function App() {
           onUpdateStaff={handleUpdateStaff}
           ambienceMedia={ambienceMedia}
           onUpdateAmbience={handleUpdateAmbience}
+          users={users}
+          onUpdateUsers={handleUpdateUsers}
+          auditLogs={auditLogs}
+          onAddAuditLog={handleAddAuditLog}
+          onClearAuditLogs={handleClearAuditLogs}
         />
 
         {/* Floating Concierge Chatbot */}
