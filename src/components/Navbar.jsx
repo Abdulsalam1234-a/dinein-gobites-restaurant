@@ -8,10 +8,9 @@ import {
   Menu as MenuIcon, 
   X
 } from 'lucide-react';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
 
 export const Navbar = ({
-  activeMode,
-  setActiveMode,
   cartCount,
   cartTotal,
   onOpenCart,
@@ -20,25 +19,46 @@ export const Navbar = ({
   setSearchQuery,
   currency = '₦',
   whatsappNumber = '07068371295',
-  onNavigateSection,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSearchInput, setShowSearchInput] = useState(false);
+  const navigate = useNavigate();
 
   const cleanPhone = whatsappNumber.replace(/[^0-9]/g, '');
   const directWhatsAppUrl = `https://wa.me/${cleanPhone.startsWith('0') ? '234' + cleanPhone.slice(1) : cleanPhone}?text=${encodeURIComponent("Hello ROMEE Go-Bite Eatery! I'd like to make an inquiry.")}`;
 
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate('/menu');
+    }
+  };
+
+  const navLinkClass = ({ isActive }) =>
+    `text-xs font-semibold tracking-wide transition-colors ${
+      isActive
+        ? 'text-mustard font-bold border-b-2 border-mustard pb-1'
+        : 'text-slate-200 hover:text-mustard'
+    }`;
+
+  const mobileNavLinkClass = ({ isActive }) =>
+    `w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold block transition-colors ${
+      isActive
+        ? 'bg-petrol-900 text-mustard font-bold'
+        : 'text-slate-200 hover:text-mustard hover:bg-petrol-900/60'
+    }`;
+
   return (
-    <header className="bg-petrol-900 border-b border-petrol-800/80 sticky top-0 z-40 text-white transition-all">
+    <header className="bg-petrol-900 border-b border-petrol-800/80 sticky top-0 z-40 text-white transition-all shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           
-          {/* Brand Logo - Styled like Foodel in screenshot */}
-          <div 
-            onClick={() => onNavigateSection('hero')} 
+          {/* Brand Logo */}
+          <Link 
+            to="/" 
             className="flex items-center gap-2.5 cursor-pointer select-none group"
           >
-            <div className="w-9 h-9 rounded-full bg-mustard flex items-center justify-center text-petrol-950 font-black shadow-md">
+            <div className="w-9 h-9 rounded-full bg-mustard flex items-center justify-center text-petrol-950 font-black shadow-md group-hover:scale-105 transition-transform">
               <UtensilsCrossed className="w-5 h-5" />
             </div>
             <div className="flex items-baseline gap-1">
@@ -49,82 +69,74 @@ export const Navbar = ({
                 Go-Bite
               </span>
             </div>
-          </div>
+          </Link>
 
-          {/* Center Navigation Links - Styled like reference image */}
-          <nav className="hidden md:flex items-center gap-7 text-xs font-semibold tracking-wide">
-            <button
-              onClick={() => onNavigateSection('hero')}
-              className="text-white hover:text-mustard transition-colors"
-            >
+          {/* Desktop Navigation Links */}
+          <nav className="hidden md:flex items-center gap-6 lg:gap-7">
+            <NavLink to="/" end className={navLinkClass}>
               Home
-            </button>
-            <button
-              onClick={() => onNavigateSection('popular')}
-              className="text-slate-200 hover:text-mustard transition-colors"
-            >
-              Popular Dishes
-            </button>
-            <button
-              onClick={() => onNavigateSection('book-table')}
-              className="text-slate-200 hover:text-mustard transition-colors"
-            >
-              Reservation / Table
-            </button>
-            <button
-              onClick={() => onNavigateSection('regular-menu')}
-              className="text-slate-200 hover:text-mustard transition-colors flex items-center gap-1.5"
-            >
-              <span>Our Menu</span>
-              <span className="w-2 h-2 rounded-full bg-mustard"></span>
-            </button>
-            <button
-              onClick={() => onNavigateSection('outlets')}
-              className="text-slate-200 hover:text-mustard transition-colors"
-            >
-              Branches
-            </button>
-            <button
-              onClick={() => onNavigateSection('faqs')}
-              className="text-slate-200 hover:text-mustard transition-colors"
-            >
+            </NavLink>
+            <NavLink to="/about" className={navLinkClass}>
+              About Us & Staff
+            </NavLink>
+            <NavLink to="/menu" className={navLinkClass}>
+              Our Menu
+            </NavLink>
+            <NavLink to="/gallery" className={navLinkClass}>
+              Virtual Tour & Ambience
+            </NavLink>
+            <NavLink to="/outlets" className={navLinkClass}>
+              Outlets & Seating
+            </NavLink>
+            <NavLink to="/faqs" className={navLinkClass}>
               FAQs
-            </button>
+            </NavLink>
           </nav>
 
           {/* Right Action Icons: Search, WhatsApp Contact Us, Cart, Admin */}
           <div className="flex items-center gap-3">
             
             {/* Search Input on Desktop */}
-            <div className="relative hidden lg:block w-44">
+            <form onSubmit={handleSearchSubmit} className="relative hidden lg:block w-40 xl:w-48">
               <input
                 type="text"
                 placeholder="Search food..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => {
+                  if (window.location.pathname !== '/menu') {
+                    navigate('/menu');
+                  }
+                }}
                 className="w-full bg-petrol-950/70 border border-petrol-700 rounded-full py-1.5 pl-8 pr-3 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-mustard transition-all"
               />
               <Search className="w-3.5 h-3.5 text-slate-300 absolute left-2.5 top-2.5 pointer-events-none" />
               {searchQuery && (
                 <button 
+                  type="button"
                   onClick={() => setSearchQuery('')}
                   className="absolute right-2.5 top-2 text-xs text-slate-400 hover:text-white"
                 >
                   ✕
                 </button>
               )}
-            </div>
+            </form>
 
             {/* Mobile Search Toggle */}
             <button
-              onClick={() => setShowSearchInput(!showSearchInput)}
+              onClick={() => {
+                setShowSearchInput(!showSearchInput);
+                if (!showSearchInput && window.location.pathname !== '/menu') {
+                  navigate('/menu');
+                }
+              }}
               className="lg:hidden p-2 text-slate-200 hover:text-mustard"
               title="Search menu"
             >
               <Search className="w-4 h-4" />
             </button>
 
-            {/* Contact Us / WhatsApp Pill Button matching screenshot */}
+            {/* Contact Us / WhatsApp Pill Button */}
             <a
               href={directWhatsAppUrl}
               target="_blank"
@@ -155,7 +167,7 @@ export const Navbar = ({
             <button
               onClick={onOpenAdmin}
               className="p-2 text-slate-300 hover:text-mustard hover:bg-petrol-800 rounded-full transition-all"
-              title="Admin & Pricing Dashboard"
+              title="Admin Portal (Manage Menu, Staff & Media)"
             >
               <Lock className="w-4 h-4" />
             </button>
@@ -173,7 +185,7 @@ export const Navbar = ({
         {/* Mobile Search Bar Expandable */}
         {showSearchInput && (
           <div className="lg:hidden pb-3 pt-1">
-            <div className="relative">
+            <form onSubmit={handleSearchSubmit} className="relative">
               <input
                 type="text"
                 placeholder="Search swallows, rice, combos..."
@@ -183,63 +195,61 @@ export const Navbar = ({
                 autoFocus
               />
               <Search className="w-4 h-4 text-mustard absolute left-3 top-2.5 pointer-events-none" />
-            </div>
+            </form>
           </div>
         )}
 
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-petrol-800 bg-petrol-950 text-xs space-y-2">
-            <button
-              onClick={() => {
-                onNavigateSection('popular');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 text-slate-200 hover:text-mustard rounded-lg"
+          <div className="md:hidden py-4 border-t border-petrol-800 bg-petrol-950 text-xs space-y-1">
+            <NavLink
+              to="/"
+              end
+              onClick={() => setMobileMenuOpen(false)}
+              className={mobileNavLinkClass}
             >
-              Popular Dishes
-            </button>
-            <button
-              onClick={() => {
-                onNavigateSection('book-table');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 text-slate-200 hover:text-mustard rounded-lg"
+              Home
+            </NavLink>
+            <NavLink
+              to="/about"
+              onClick={() => setMobileMenuOpen(false)}
+              className={mobileNavLinkClass}
             >
-              Book A Table / Seated Order
-            </button>
-            <button
-              onClick={() => {
-                onNavigateSection('regular-menu');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 text-slate-200 hover:text-mustard rounded-lg"
+              About Us & Leadership Staff
+            </NavLink>
+            <NavLink
+              to="/menu"
+              onClick={() => setMobileMenuOpen(false)}
+              className={mobileNavLinkClass}
             >
-              Our Regular Menu
-            </button>
-            <button
-              onClick={() => {
-                onNavigateSection('outlets');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 text-slate-200 hover:text-mustard rounded-lg"
+              Our Master Menu
+            </NavLink>
+            <NavLink
+              to="/gallery"
+              onClick={() => setMobileMenuOpen(false)}
+              className={mobileNavLinkClass}
             >
-              Our Outlets & Branches
-            </button>
-            <button
-              onClick={() => {
-                onNavigateSection('faqs');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full text-left px-3 py-2 text-slate-200 hover:text-mustard rounded-lg"
+              Virtual Tour & Ambience
+            </NavLink>
+            <NavLink
+              to="/outlets"
+              onClick={() => setMobileMenuOpen(false)}
+              className={mobileNavLinkClass}
             >
-              FAQs
-            </button>
+              Physical Outlets & Seating
+            </NavLink>
+            <NavLink
+              to="/faqs"
+              onClick={() => setMobileMenuOpen(false)}
+              className={mobileNavLinkClass}
+            >
+              Help & FAQs
+            </NavLink>
             <a
               href={directWhatsAppUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full text-left px-3 py-2 text-emerald-400 hover:bg-petrol-900 rounded-lg flex items-center gap-2"
+              className="w-full text-left px-3 py-2 text-emerald-400 hover:bg-petrol-900 rounded-lg flex items-center gap-2 pt-2"
             >
               <MessageCircle className="w-4 h-4" />
               <span>WhatsApp Us: 07068371295</span>
@@ -252,7 +262,7 @@ export const Navbar = ({
               className="w-full text-left px-3 py-2 text-mustard hover:bg-petrol-900 rounded-lg flex items-center gap-2 border-t border-petrol-800 pt-3"
             >
               <Lock className="w-4 h-4" />
-              <span>Admin Management</span>
+              <span>Admin Management Portal</span>
             </button>
           </div>
         )}

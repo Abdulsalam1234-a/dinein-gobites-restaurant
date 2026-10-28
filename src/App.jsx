@@ -1,33 +1,45 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+
+// Layout & Global Components
 import { Navbar } from './components/Navbar';
-import { HeroSection } from './components/HeroSection';
-import { BookTableBar } from './components/BookTableBar';
-import { PopularDishesSection } from './components/PopularDishesSection';
-import { RegularMenuSection } from './components/RegularMenuSection';
-import { MobileAppPromo } from './components/MobileAppPromo';
-import { OutletsSection } from './components/OutletsSection';
-import { FAQSection } from './components/FAQSection';
+import { Footer } from './components/Footer';
+import { ScrollToTop } from './components/ScrollToTop';
 import { CartDrawer } from './components/CartDrawer';
 import { WhatsAppOrderModal } from './components/WhatsAppOrderModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ChatbotWidget } from './components/ChatbotWidget';
-import { Footer } from './components/Footer';
 
+// Pages
+import { HomePage } from './pages/HomePage';
+import { AboutPage } from './pages/AboutPage';
+import { MenuPage } from './pages/MenuPage';
+import { GalleryPage } from './pages/GalleryPage';
+import { OutletsPage } from './pages/OutletsPage';
+import { FAQPage } from './pages/FAQPage';
+
+// Data & Storage
 import { 
   loadMenuFromStorage, 
   saveMenuToStorage, 
   loadSettingsFromStorage, 
   saveSettingsToStorage, 
+  loadStaffFromStorage,
+  saveStaffToStorage,
+  loadAmbienceFromStorage,
+  saveAmbienceToStorage,
   resetStorageToDefaults 
 } from './utils/storage';
 import { compileWhatsAppOrder } from './utils/whatsapp';
 
 export default function App() {
-  // 1. Persistent State: Menu & Settings
+  // 1. Persistent State: Menu, Staff, Ambience Media, Settings
   const [menuItems, setMenuItems] = useState(loadMenuFromStorage);
   const [settings, setSettings] = useState(loadSettingsFromStorage);
+  const [staffMembers, setStaffMembers] = useState(loadStaffFromStorage);
+  const [ambienceMedia, setAmbienceMedia] = useState(loadAmbienceFromStorage);
 
-  // 2. Active Mode: 'dinein' | 'gobites'
+  // 2. Active Dining Mode: 'dinein' | 'gobites'
   const [activeMode, setActiveMode] = useState('dinein');
 
   // Pre-selected table state from booking bar
@@ -57,28 +69,8 @@ export default function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [orderModalData, setOrderModalData] = useState(null);
 
-  // 5. Search
+  // 5. Global Search
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Mode change handler
-  const handleModeChange = (mode, shouldScroll = true) => {
-    setActiveMode(mode);
-    if (shouldScroll) {
-      scrollToSection('regular-menu');
-    }
-  };
-
-  // Navigation helper
-  const scrollToSection = (sectionId) => {
-    if (sectionId === 'hero') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      const el = document.getElementById(sectionId);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
-  };
 
   // 6. Cart Actions
   const handleAddToCart = (item) => {
@@ -146,142 +138,175 @@ export default function App() {
     saveSettingsToStorage(newSettings);
   };
 
-  const handleResetDefaults = () => {
-    const { menu: defaultMenu, settings: defaultSettings } = resetStorageToDefaults();
-    setMenuItems(defaultMenu);
-    setSettings(defaultSettings);
+  const handleUpdateStaff = (newStaff) => {
+    setStaffMembers(newStaff);
+    saveStaffToStorage(newStaff);
   };
 
-  // Filtered Items for search if applicable
-  const displayItems = searchQuery.trim()
-    ? menuItems.filter((item) => {
-        const q = searchQuery.toLowerCase();
-        return item.name.toLowerCase().includes(q) || 
-               item.description.toLowerCase().includes(q) || 
-               item.category.toLowerCase().includes(q);
-      })
-    : menuItems;
+  const handleUpdateAmbience = (newAmbience) => {
+    setAmbienceMedia(newAmbience);
+    saveAmbienceToStorage(newAmbience);
+  };
+
+  const handleResetDefaults = () => {
+    const { menu: defaultMenu, settings: defaultSettings, staff: defaultStaff, ambience: defaultAmbience } = resetStorageToDefaults();
+    setMenuItems(defaultMenu);
+    setSettings(defaultSettings);
+    setStaffMembers(defaultStaff);
+    setAmbienceMedia(defaultAmbience);
+  };
 
   return (
-    <div className="min-h-screen bg-[#F4F6F9] text-slate-800 flex flex-col font-sans selection:bg-mustard selection:text-petrol-950">
-      
-      {/* 1. Header Navigation - Matching top of reference image */}
-      <Navbar
-        activeMode={activeMode}
-        setActiveMode={handleModeChange}
-        cartCount={cartCount}
-        cartTotal={cartTotal}
-        onOpenCart={() => setIsCartOpen(true)}
-        onOpenAdmin={() => setIsAdminOpen(true)}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        currency={settings.currency}
-        whatsappNumber={settings.whatsappNumber}
-        onNavigateSection={scrollToSection}
-      />
+    <BrowserRouter>
+      <ScrollToTop />
 
-      <main className="flex-1">
+      <div className="min-h-screen bg-[#F4F6F9] text-slate-800 flex flex-col font-sans selection:bg-mustard selection:text-petrol-950">
         
-        {/* 2. Hero Section: "We serve the taste you love" with curved bottom & concentric halo circular plate */}
-        <HeroSection
-          onExploreFood={() => scrollToSection('regular-menu')}
-          onOpenWhatsAppGuide={() => scrollToSection('mobile-promo')}
-        />
-
-        {/* 3. Floating Overlapping "Book A Table & Seated Orders" card */}
-        <BookTableBar
-          activeMode={activeMode}
-          setActiveMode={handleModeChange}
-          onSelectTable={(table) => setPrefilledTable(table)}
-          onExploreMenu={() => scrollToSection('regular-menu')}
-        />
-
-        {/* 4. "Our Popular Dishes" - 3 Circular plate cards with carousel arrows */}
-        <PopularDishesSection
-          items={displayItems}
-          onAddToCart={handleAddToCart}
+        {/* Navigation Bar across all pages */}
+        <Navbar
+          cartCount={cartCount}
+          cartTotal={cartTotal}
+          onOpenCart={() => setIsCartOpen(true)}
+          onOpenAdmin={() => setIsAdminOpen(true)}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
           currency={settings.currency}
+          whatsappNumber={settings.whatsappNumber}
         />
 
-        {/* 5. "Our Regular Menu" - Two panoramic photos & two-column dotted leader menu list */}
-        <RegularMenuSection
-          menuItems={displayItems}
+        {/* Dynamic Multi-Page Routes */}
+        <main className="flex-1">
+          <Routes>
+            <Route 
+              path="/" 
+              element={
+                <HomePage
+                  menuItems={menuItems}
+                  onAddToCart={handleAddToCart}
+                  currency={settings.currency}
+                  activeMode={activeMode}
+                  setActiveMode={setActiveMode}
+                  onSelectTable={(table) => setPrefilledTable(table)}
+                  whatsappNumber={settings.whatsappNumber}
+                  ambienceMedia={ambienceMedia}
+                />
+              } 
+            />
+
+            <Route 
+              path="/about" 
+              element={
+                <AboutPage 
+                  staffMembers={staffMembers}
+                />
+              } 
+            />
+
+            <Route 
+              path="/menu" 
+              element={
+                <MenuPage
+                  menuItems={menuItems}
+                  activeMode={activeMode}
+                  setActiveMode={setActiveMode}
+                  onAddToCart={handleAddToCart}
+                  currency={settings.currency}
+                  cartCount={cartCount}
+                  cartTotal={cartTotal}
+                  onOpenCart={() => setIsCartOpen(true)}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                />
+              } 
+            />
+
+            <Route 
+              path="/gallery" 
+              element={
+                <GalleryPage 
+                  ambienceMedia={ambienceMedia}
+                />
+              } 
+            />
+
+            <Route 
+              path="/outlets" 
+              element={
+                <OutletsPage 
+                  whatsappNumber={settings.whatsappNumber}
+                />
+              } 
+            />
+
+            <Route 
+              path="/faqs" 
+              element={
+                <FAQPage 
+                  whatsappNumber={settings.whatsappNumber}
+                />
+              } 
+            />
+
+            {/* Fallback to Home */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+
+        {/* Global Footer */}
+        <Footer
+          onOpenAdmin={() => setIsAdminOpen(true)}
+          whatsappNumber={settings.whatsappNumber}
+        />
+
+        {/* Slide-over Cart Drawer */}
+        <CartDrawer
+          isOpen={isCartOpen}
+          onClose={() => setIsCartOpen(false)}
+          cart={cart}
           activeMode={activeMode}
-          setActiveMode={handleModeChange}
-          onAddToCart={handleAddToCart}
+          setActiveMode={setActiveMode}
+          onUpdateQuantity={handleUpdateCartQuantity}
+          onRemoveItem={handleRemoveCartItem}
+          onClearCart={handleClearCart}
+          onProceedToWhatsApp={handleProceedToWhatsApp}
           currency={settings.currency}
+          serviceChargeDineIn={settings.serviceChargeDineIn}
+          packagingFeeGoBites={settings.packagingFeeGoBites}
+          prefilledTable={prefilledTable}
         />
 
-        {/* 6. "Download Our Mobile App / Order on WhatsApp" Yellow Promo Card & Smartphone Mockup */}
-        <div id="mobile-promo">
-          <MobileAppPromo 
-            whatsappNumber={settings.whatsappNumber} 
-          />
-        </div>
-
-        {/* 7. Outlets & Physical Branches Section */}
-        <OutletsSection 
-          whatsappNumber={settings.whatsappNumber} 
+        {/* WhatsApp Order Confirmation Modal */}
+        <WhatsAppOrderModal
+          isOpen={Boolean(orderModalData)}
+          onClose={() => setOrderModalData(null)}
+          orderDetails={orderModalData}
         />
 
-        {/* 8. Frequently Asked Questions Section */}
-        <FAQSection 
-          whatsappNumber={settings.whatsappNumber} 
+        {/* Admin Dashboard Modal */}
+        <AdminDashboard
+          isOpen={isAdminOpen}
+          onClose={() => setIsAdminOpen(false)}
+          menuItems={menuItems}
+          onUpdateMenuItems={handleUpdateMenuItems}
+          settings={settings}
+          onUpdateSettings={handleUpdateSettings}
+          onResetDefaults={handleResetDefaults}
+          currency={settings.currency}
+          staffMembers={staffMembers}
+          onUpdateStaff={handleUpdateStaff}
+          ambienceMedia={ambienceMedia}
+          onUpdateAmbience={handleUpdateAmbience}
         />
 
-      </main>
+        {/* Floating Concierge Chatbot */}
+        <ChatbotWidget
+          _activeMode={activeMode}
+          setActiveMode={setActiveMode}
+          onOpenCart={() => setIsCartOpen(true)}
+          whatsappNumber={settings.whatsappNumber}
+        />
 
-      {/* 9. Dark Slate/Navy Footer with Newsletter & Instagram Photos Grid */}
-      <Footer
-        onNavigateSection={scrollToSection}
-        onOpenAdmin={() => setIsAdminOpen(true)}
-        whatsappNumber={settings.whatsappNumber}
-      />
-
-      {/* Slide-over Cart Drawer */}
-      <CartDrawer
-        isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        cart={cart}
-        activeMode={activeMode}
-        setActiveMode={(m) => handleModeChange(m, false)}
-        onUpdateQuantity={handleUpdateCartQuantity}
-        onRemoveItem={handleRemoveCartItem}
-        onClearCart={handleClearCart}
-        onProceedToWhatsApp={handleProceedToWhatsApp}
-        currency={settings.currency}
-        serviceChargeDineIn={settings.serviceChargeDineIn}
-        packagingFeeGoBites={settings.packagingFeeGoBites}
-        prefilledTable={prefilledTable}
-      />
-
-      {/* WhatsApp Order Confirmation Modal */}
-      <WhatsAppOrderModal
-        isOpen={Boolean(orderModalData)}
-        onClose={() => setOrderModalData(null)}
-        orderDetails={orderModalData}
-      />
-
-      {/* Admin Dashboard Modal */}
-      <AdminDashboard
-        isOpen={isAdminOpen}
-        onClose={() => setIsAdminOpen(false)}
-        menuItems={menuItems}
-        onUpdateMenuItems={handleUpdateMenuItems}
-        settings={settings}
-        onUpdateSettings={handleUpdateSettings}
-        onResetDefaults={handleResetDefaults}
-        currency={settings.currency}
-      />
-
-      {/* Floating Interactive Concierge Bot */}
-      <ChatbotWidget
-        _activeMode={activeMode}
-        setActiveMode={handleModeChange}
-        onOpenCart={() => setIsCartOpen(true)}
-        whatsappNumber={settings.whatsappNumber}
-      />
-
-    </div>
+      </div>
+    </BrowserRouter>
   );
 }

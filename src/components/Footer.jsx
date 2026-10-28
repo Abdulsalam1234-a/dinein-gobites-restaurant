@@ -5,8 +5,9 @@ import {
   MessageCircle, 
   Camera 
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
-export const Footer = ({ onNavigateSection, onOpenAdmin, whatsappNumber = '07068371295' }) => {
+export const Footer = ({ onOpenAdmin, whatsappNumber = '07068371295' }) => {
   const [emailInput, setEmailInput] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
@@ -69,7 +70,7 @@ export const Footer = ({ onNavigateSection, onOpenAdmin, whatsappNumber = '07068
               </p>
             )}
 
-            {/* Social Icons row matching design */}
+            {/* Social Icons row */}
             <div className="flex items-center gap-3 pt-2 text-slate-400">
               <a href="#" aria-label="Facebook" className="w-8 h-8 rounded-lg bg-[#111A24] flex items-center justify-center hover:text-mustard hover:bg-slate-800 transition-colors">
                 <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
@@ -97,25 +98,26 @@ export const Footer = ({ onNavigateSection, onOpenAdmin, whatsappNumber = '07068
           {/* Col 2: Services (lg:col-span-2) */}
           <div className="lg:col-span-2 space-y-3">
             <h4 className="font-serif text-sm font-bold text-white uppercase tracking-wider">
-              Services
+              Dining Services
             </h4>
             <ul className="space-y-2 text-slate-400 text-xs">
-              <li><button onClick={() => onNavigateSection('book-table')} className="hover:text-white transition-colors">Dine-In Lounge</button></li>
-              <li><button onClick={() => onNavigateSection('regular-menu')} className="hover:text-white transition-colors">Go Bites Takeaway</button></li>
-              <li><a href={directWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Office Catering</a></li>
-              <li><a href={directWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Event Delivery</a></li>
+              <li><Link to="/menu" className="hover:text-white transition-colors">Dine-In Lounge Swallows</Link></li>
+              <li><Link to="/menu" className="hover:text-white transition-colors">Go Bites Express Combos</Link></li>
+              <li><a href={directWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Office & Bulk Catering</a></li>
+              <li><Link to="/outlets" className="hover:text-white transition-colors">Table Priority Booking</Link></li>
             </ul>
           </div>
 
           {/* Col 3: About (lg:col-span-2) */}
           <div className="lg:col-span-2 space-y-3">
             <h4 className="font-serif text-sm font-bold text-white uppercase tracking-wider">
-              About
+              Company
             </h4>
             <ul className="space-y-2 text-slate-400 text-xs">
-              <li><button onClick={() => onNavigateSection('hero')} className="hover:text-white transition-colors">Our Story</button></li>
-              <li><button onClick={() => onNavigateSection('outlets')} className="hover:text-white transition-colors">Our Outlets</button></li>
-              <li><button onClick={() => onNavigateSection('faqs')} className="hover:text-white transition-colors">Customer Care</button></li>
+              <li><Link to="/about" className="hover:text-white transition-colors">Our Story & Heritage</Link></li>
+              <li><Link to="/about" className="hover:text-white transition-colors">Managing Director & Staff</Link></li>
+              <li><Link to="/gallery" className="hover:text-white transition-colors">Virtual Tour & Kitchen</Link></li>
+              <li><Link to="/outlets" className="hover:text-white transition-colors">Outlets & Locations</Link></li>
               <li><button onClick={onOpenAdmin} className="text-mustard hover:underline flex items-center gap-1"><Lock className="w-3 h-3" /> Admin Portal</button></li>
             </ul>
           </div>
@@ -123,17 +125,17 @@ export const Footer = ({ onNavigateSection, onOpenAdmin, whatsappNumber = '07068
           {/* Col 4: Help (lg:col-span-2) */}
           <div className="lg:col-span-2 space-y-3">
             <h4 className="font-serif text-sm font-bold text-white uppercase tracking-wider">
-              Help
+              Help & Support
             </h4>
             <ul className="space-y-2 text-slate-400 text-xs">
-              <li><button onClick={() => onNavigateSection('faqs')} className="hover:text-white transition-colors">FAQ</button></li>
+              <li><Link to="/faqs" className="hover:text-white transition-colors">Frequently Asked Questions</Link></li>
               <li><a href={directWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-400 font-bold flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> 07068371295</a></li>
-              <li className="text-slate-400">Main Hub: Victoria Island / Lekki</li>
-              <li className="text-slate-400">Depot: Allen Ave, Ikeja</li>
+              <li className="text-slate-400">Island Hub: Victoria Island / Lekki</li>
+              <li className="text-slate-400">Mainland Depot: Allen Ave, Ikeja</li>
             </ul>
           </div>
 
-          {/* Col 5: Instagram Photo Grid - Exact Match to Design (lg:col-span-2) */}
+          {/* Col 5: Instagram Photo Grid (lg:col-span-2) */}
           <div className="lg:col-span-2 space-y-3">
             <h4 className="font-serif text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
               <Camera className="w-3.5 h-3.5 text-mustard" />
