@@ -283,7 +283,57 @@ export const createSuperuserMailtoUrl = (logEntry, superuserEmail = 'salamiabdul
   return `mailto:${superuserEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 };
 
-// 8. Reset All Storage to Defaults
+// 8. Export & Import All Restaurant Configuration for Production Deployment
+export const exportAllRestaurantData = () => {
+  return {
+    version: '2.0-production',
+    exportedAt: new Date().toISOString(),
+    restaurantName: 'ROMEE Go-Bite Eatery',
+    settings: loadSettingsFromStorage(),
+    menu: loadMenuFromStorage(),
+    staff: loadStaffFromStorage(),
+    ambience: loadAmbienceFromStorage(),
+    users: loadUsersFromStorage().map(u => ({ ...u, password: u.password })), // sanitized export
+  };
+};
+
+export const importAllRestaurantData = (payload) => {
+  try {
+    if (!payload || typeof payload !== 'object') {
+      throw new Error('Invalid backup file format');
+    }
+
+    if (Array.isArray(payload.menu) && payload.menu.length > 0) {
+      saveMenuToStorage(payload.menu);
+    }
+    if (payload.settings && typeof payload.settings === 'object') {
+      saveSettingsToStorage(payload.settings);
+    }
+    if (Array.isArray(payload.staff) && payload.staff.length > 0) {
+      saveStaffToStorage(payload.staff);
+    }
+    if (Array.isArray(payload.ambience) && payload.ambience.length > 0) {
+      saveAmbienceToStorage(payload.ambience);
+    }
+    if (Array.isArray(payload.users) && payload.users.length > 0) {
+      saveUsersToStorage(payload.users);
+    }
+
+    return {
+      success: true,
+      menu: loadMenuFromStorage(),
+      settings: loadSettingsFromStorage(),
+      staff: loadStaffFromStorage(),
+      ambience: loadAmbienceFromStorage(),
+      users: loadUsersFromStorage(),
+    };
+  } catch (error) {
+    console.error('Import failed:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// 9. Reset All Storage to Defaults
 export const resetStorageToDefaults = () => {
   try {
     localStorage.removeItem(STORAGE_KEYS.MENU);

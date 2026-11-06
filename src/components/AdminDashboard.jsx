@@ -30,12 +30,31 @@ import {
   Eye,
   LogOut,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  Download,
+  Copy,
+  Check,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   createSuperuserWhatsAppUrl, 
-  createSuperuserMailtoUrl 
+  createSuperuserMailtoUrl,
+  exportAllRestaurantData,
+  importAllRestaurantData
 } from '../utils/storage';
+import {
+  detectSqlInjection,
+  detectXss,
+  sanitizeInput,
+  validateAndSanitizeFormData,
+  hashPassword,
+  verifyPassword,
+  checkRateLimit,
+  recordFailedAttempt,
+  clearRateLimit,
+  createSecureSession,
+  validateSession
+} from '../utils/security';
 
 export const AdminDashboard = ({
   isOpen,
@@ -62,22 +81,42 @@ export const AdminDashboard = ({
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = sessionStorage.getItem('romee_current_admin_user');
-      return saved ? JSON.parse(saved) : null;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.user || parsed;
+      }
+      return null;
     } catch {
       return null;
     }
   });
   const [authError, setAuthError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Active Tab
   const [activeTab, setActiveTab] = useState('products'); // 'products' | 'staff' | 'ambience' | 'users' | 'audit' | 'pricing' | 'settings'
 
-  // Notification Banner for recent audit action
-  const [recentNotification, setRecentNotification] = useState(null);
+  // Security & Threat Alerts
+  const [securityThreatAlert, setSecurityThreatAlert] = useState(null);
+
+  // Toast Notification
   const [toastMessage, setToastMessage] = useState('');
 
   // Confirmation Delete Modal
   const [deleteConfirmation, setDeleteConfirmation] = useState(null); // { type, id, title, action }
+
+  // Password Change Modal
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [changePasswordForm, setChangePasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [passwordChangeError, setPasswordChangeError] = useState('');
+
+  // Production Code Export Modal
+  const [showCodeExportModal, setShowCodeExportModal] = useState(false);
+  const [copiedCodeNotice, setCopiedCodeNotice] = useState(false);
 
   // 1. Products Tab State
   const [filterChannel, setFilterChannel] = useState('all');
@@ -118,6 +157,20 @@ export const AdminDashboard = ({
     setSettingsForm(settings);
   }, [settings]);
 
+  // Session Inactivity Verification Loop
+  useEffect(() => {
+    if (currentUser) {
+      const interval = setInterval(() => {
+        const validation = validateSession();
+        if (validation && validation.expired) {
+          setCurrentUser(null);
+          showToast('Session expired after 30 minutes of inactivity for security.');
+        }
+      }, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [currentUser]);
+
   if (!isOpen) return null;
 
   const isSuperuser = currentUser?.role === 'superuser';
@@ -128,34 +181,88 @@ export const AdminDashboard = ({
   };
 
   const triggerAudit = (action, details) => {
-    const logItem = onAddAuditLog(action, details, currentUser);
-    if (logItem) {
-      setRecentNotification(logItem);
-    }
+    onAddAuditLog(action, details, currentUser);
   };
 
-  // Login handler
-  const handleLoginSubmit = (e) => {
+  // ================= SECURE AUTHENTICATION HANDLER =================
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
+    setAuthError('');
+    setIsLoggingIn(true);
+
     const cleanEmail = emailInput.trim().toLowerCase();
     const cleanPassword = passwordInput.trim();
 
-    // Check against users list
-    const found = users.find(
-      (u) => u.email.toLowerCase() === cleanEmail && u.password === cleanPassword
-    );
-
-    if (found) {
-      if (found.status === 'disabled') {
-        setAuthError('This account has been disabled by the Superuser.');
+    try {
+      // 1. Check rate-limit / brute-force lockout
+      const rateCheck = checkRateLimit(cleanEmail);
+      if (!rateCheck.allowed) {
+        setAuthError(`Account temporarily locked due to 5 consecutive failed attempts. Please wait ${Math.ceil(rateCheck.remainingSeconds / 60)} minutes.`);
+        setIsLoggingIn(false);
         return;
       }
-      setCurrentUser(found);
-      sessionStorage.setItem('romee_current_admin_user', JSON.stringify(found));
-      setAuthError('');
-      showToast(`Welcome back, ${found.name}!`);
-    } else {
-      setAuthError('Invalid email or password. Default superuser is salamiabdullahi247@gmail.com with password 1234');
+
+      // 2. Scan input for SQL injection patterns
+      const sqliCheck = detectSqlInjection(cleanEmail) || detectSqlInjection(cleanPassword);
+      if (sqliCheck.isSuspicious) {
+        triggerAudit('SECURITY_THREAT_BLOCKED', `SQL Injection pattern blocked on admin login: ${sqliCheck.offendingSnippet}`);
+        setAuthError('Access Denied: Malicious pattern detected in login credentials.');
+        setIsLoggingIn(false);
+        return;
+      }
+
+      // 3. Locate user
+      const found = users.find((u) => u.email.toLowerCase() === cleanEmail);
+      if (!found) {
+        const failRecord = recordFailedAttempt(cleanEmail);
+        triggerAudit('LOGIN_FAILED', `Failed login attempt for unknown email: ${cleanEmail}`);
+        setAuthError(`Invalid credentials. ${Math.max(0, 5 - failRecord.attempts)} attempt(s) remaining before temporary lockout.`);
+        setIsLoggingIn(false);
+        return;
+      }
+
+      if (found.status === 'disabled') {
+        setAuthError('This account has been disabled by the Superuser.');
+        setIsLoggingIn(false);
+        return;
+      }
+
+      // 4. Verify password with Salted Hash / Legacy plaintext support
+      const isMatch = await verifyPassword(cleanPassword, found.password);
+      if (!isMatch) {
+        const failRecord = recordFailedAttempt(cleanEmail);
+        triggerAudit('LOGIN_FAILED', `Failed password attempt for user: ${cleanEmail}`);
+        if (failRecord.isLocked) {
+          triggerAudit('ACCOUNT_LOCKED', `Account ${cleanEmail} locked out due to brute force limits`);
+          setAuthError('Security Alert: Account has been temporarily locked for 10 minutes due to 5 failed attempts.');
+        } else {
+          setAuthError(`Invalid credentials. ${Math.max(0, 5 - failRecord.attempts)} attempt(s) remaining before temporary lockout.`);
+        }
+        setIsLoggingIn(false);
+        return;
+      }
+
+      // 5. Success! Clear brute-force records
+      clearRateLimit(cleanEmail);
+
+      // Auto-upgrade legacy plaintext password to salted SHA-256 hash if needed
+      if (!found.password.includes(':')) {
+        const upgradedHash = await hashPassword(cleanPassword);
+        const updatedUsers = users.map((u) => (u.id === found.id ? { ...u, password: upgradedHash } : u));
+        onUpdateUsers(updatedUsers);
+        found.password = upgradedHash;
+      }
+
+      // 6. Create secure session token
+      const session = createSecureSession(found);
+      setCurrentUser(session.user);
+      triggerAudit('LOGIN_SUCCESSFUL', `${found.name} signed into Admin Portal as ${found.role.toUpperCase()}`);
+      showToast(`Welcome back, ${found.name}! Session authenticated.`);
+    } catch (err) {
+      console.error(err);
+      setAuthError('An authentication error occurred. Please try again.');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -164,6 +271,7 @@ export const AdminDashboard = ({
     sessionStorage.removeItem('romee_current_admin_user');
     setEmailInput('salamiabdullahi247@gmail.com');
     setPasswordInput('1234');
+    showToast('You have been logged out securely.');
   };
 
   // Image compression
@@ -210,6 +318,7 @@ export const AdminDashboard = ({
     setIsAddingNew(true);
     setCurrentImageValue('');
     setImageSourceMode('upload');
+    setSecurityThreatAlert(null);
   };
 
   const handleOpenEditProduct = (item) => {
@@ -217,6 +326,7 @@ export const AdminDashboard = ({
     setIsAddingNew(false);
     setCurrentImageValue(item.image || '');
     setImageSourceMode(item.image?.startsWith('data:') ? 'upload' : 'url');
+    setSecurityThreatAlert(null);
   };
 
   const handleToggleStock = (item) => {
@@ -252,26 +362,45 @@ export const AdminDashboard = ({
     e.preventDefault();
     const formData = new FormData(e.target);
     const finalImage = currentImageValue || 
-                       formData.get('image') || 
+                       formData.get('image')?.toString() || 
                        'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80';
 
-    const rawOptions = formData.get('options') || '';
+    // Anti-SQLi & Anti-XSS validation
+    const validation = validateAndSanitizeFormData({
+      name: formData.get('name')?.toString() || '',
+      description: formData.get('description')?.toString() || '',
+      category: formData.get('category')?.toString() || '',
+      channel: formData.get('channel')?.toString() || '',
+      prepTime: formData.get('prepTime')?.toString() || '',
+      badge: formData.get('badge')?.toString() || '',
+      options: formData.get('options')?.toString() || '',
+      image: finalImage,
+    });
+
+    if (!validation.valid) {
+      setSecurityThreatAlert(validation);
+      triggerAudit('SECURITY_THREAT_BLOCKED', validation.error);
+      return;
+    }
+
+    const { sanitized } = validation;
+    const rawOptions = sanitized.options || '';
     const parsedOptions = rawOptions
       ? rawOptions.split(',').map((o) => o.trim()).filter(Boolean)
       : (editingItem?.options || []);
 
     const productData = {
       id: editingItem?.id || `custom-${Date.now()}`,
-      name: formData.get('name')?.toString().trim(),
-      description: formData.get('description')?.toString().trim(),
-      price: Number(formData.get('price')) || 1000,
-      category: formData.get('category')?.toString().trim() || 'Combos',
-      channel: formData.get('channel')?.toString().trim() || 'gobites',
-      image: finalImage,
+      name: sanitized.name,
+      description: sanitized.description,
+      price: Math.max(100, Number(formData.get('price')) || 1000),
+      category: sanitized.category || 'Combos',
+      channel: sanitized.channel || 'gobites',
+      image: sanitized.image,
       isAvailable: formData.get('isAvailable') === 'on',
       isSpicy: formData.get('isSpicy') === 'on',
-      prepTime: formData.get('prepTime')?.toString().trim() || '15 mins',
-      badge: formData.get('badge')?.toString().trim() || '',
+      prepTime: sanitized.prepTime || '15 mins',
+      badge: sanitized.badge || '',
       options: parsedOptions,
     };
 
@@ -295,6 +424,7 @@ export const AdminDashboard = ({
     onUpdateMenuItems(updated);
     setEditingItem(null);
     setIsAddingNew(false);
+    setSecurityThreatAlert(null);
   };
 
   // ================= 2. STAFF LEADERSHIP CRUD =================
@@ -303,6 +433,7 @@ export const AdminDashboard = ({
     setIsAddingStaff(true);
     setStaffImageValue('');
     setStaffImageMode('upload');
+    setSecurityThreatAlert(null);
   };
 
   const handleOpenEditStaff = (staff) => {
@@ -310,6 +441,7 @@ export const AdminDashboard = ({
     setIsAddingStaff(false);
     setStaffImageValue(staff.image || '');
     setStaffImageMode(staff.image?.startsWith('data:') ? 'upload' : 'url');
+    setSecurityThreatAlert(null);
   };
 
   const handleDeleteStaff = (staff) => {
@@ -332,18 +464,35 @@ export const AdminDashboard = ({
     e.preventDefault();
     const formData = new FormData(e.target);
     const finalImage = staffImageValue || 
-                       formData.get('image') || 
+                       formData.get('image')?.toString() || 
                        'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=600&q=80';
 
+    // Anti-SQLi & Anti-XSS validation
+    const validation = validateAndSanitizeFormData({
+      name: formData.get('name')?.toString() || '',
+      role: formData.get('role')?.toString() || '',
+      department: formData.get('department')?.toString() || '',
+      bio: formData.get('bio')?.toString() || '',
+      quote: formData.get('quote')?.toString() || '',
+      image: finalImage,
+    });
+
+    if (!validation.valid) {
+      setSecurityThreatAlert(validation);
+      triggerAudit('SECURITY_THREAT_BLOCKED', validation.error);
+      return;
+    }
+
+    const { sanitized } = validation;
     const staffData = {
       id: editingStaff?.id || `staff-${Date.now()}`,
-      name: formData.get('name')?.toString().trim(),
-      role: formData.get('role')?.toString().trim(),
-      department: formData.get('department')?.toString().trim() || 'Leadership',
-      bio: formData.get('bio')?.toString().trim(),
-      quote: formData.get('quote')?.toString().trim(),
+      name: sanitized.name,
+      role: sanitized.role,
+      department: sanitized.department || 'Leadership',
+      bio: sanitized.bio,
+      quote: sanitized.quote,
       priority: Number(formData.get('priority')) || 99,
-      image: finalImage,
+      image: sanitized.image,
     };
 
     let updated;
@@ -360,6 +509,7 @@ export const AdminDashboard = ({
     onUpdateStaff(updated);
     setEditingStaff(null);
     setIsAddingStaff(false);
+    setSecurityThreatAlert(null);
   };
 
   // ================= 3. AMBIENCE & MEDIA CRUD =================
@@ -370,6 +520,7 @@ export const AdminDashboard = ({
     setMediaImageMode('upload');
     setMediaImageValue('');
     setMediaVideoUrl('');
+    setSecurityThreatAlert(null);
   };
 
   const handleOpenEditMedia = (media) => {
@@ -379,6 +530,7 @@ export const AdminDashboard = ({
     setMediaImageValue(media.url || '');
     setMediaVideoUrl(media.type === 'video' ? media.url : '');
     setMediaImageMode(media.url?.startsWith('data:') ? 'upload' : 'url');
+    setSecurityThreatAlert(null);
   };
 
   const handleDeleteMedia = (media) => {
@@ -419,19 +571,35 @@ export const AdminDashboard = ({
 
     if (mediaTypeMode === 'video') {
       finalUrl = formData.get('videoUrl')?.toString().trim() || mediaVideoUrl;
-      finalThumbnail = mediaImageValue || formData.get('thumbnailUrl') || 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=1000&q=80';
+      finalThumbnail = mediaImageValue || formData.get('thumbnailUrl')?.toString() || 'https://images.unsplash.com/photo-1556910103-1c02745aae4d?auto=format&fit=crop&w=1000&q=80';
     } else {
       finalUrl = mediaImageValue || formData.get('imageUrl')?.toString().trim() || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1000&q=80';
     }
 
+    // Anti-SQLi & Anti-XSS validation
+    const validation = validateAndSanitizeFormData({
+      title: formData.get('title')?.toString() || '',
+      category: formData.get('category')?.toString() || '',
+      caption: formData.get('caption')?.toString() || '',
+      url: finalUrl,
+      thumbnail: finalThumbnail,
+    });
+
+    if (!validation.valid) {
+      setSecurityThreatAlert(validation);
+      triggerAudit('SECURITY_THREAT_BLOCKED', validation.error);
+      return;
+    }
+
+    const { sanitized } = validation;
     const mediaData = {
       id: editingMedia?.id || `amb-${Date.now()}`,
       type: mediaTypeMode,
-      title: formData.get('title')?.toString().trim(),
-      category: formData.get('category')?.toString().trim() || 'kitchen',
-      caption: formData.get('caption')?.toString().trim(),
-      url: finalUrl,
-      thumbnail: finalThumbnail,
+      title: sanitized.title,
+      category: sanitized.category || 'kitchen',
+      caption: sanitized.caption,
+      url: sanitized.url,
+      thumbnail: sanitized.thumbnail,
       featuredOnHome: formData.get('featuredOnHome') === 'on',
     };
 
@@ -449,17 +617,20 @@ export const AdminDashboard = ({
     onUpdateAmbience(updated);
     setEditingMedia(null);
     setIsAddingMedia(false);
+    setSecurityThreatAlert(null);
   };
 
-  // ================= 4. USER ACCESS MANAGEMENT (Superuser) =================
+  // ================= 4. USER ACCESS MANAGEMENT =================
   const handleOpenAddUser = () => {
     setEditingUser(null);
     setIsAddingUser(true);
+    setSecurityThreatAlert(null);
   };
 
   const handleOpenEditUser = (user) => {
     setEditingUser(user);
     setIsAddingUser(false);
+    setSecurityThreatAlert(null);
   };
 
   const handleDeleteUser = (user) => {
@@ -482,14 +653,30 @@ export const AdminDashboard = ({
     });
   };
 
-  const handleSaveUser = (e) => {
+  const handleSaveUser = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    const email = formData.get('email')?.toString().trim().toLowerCase();
-    const password = formData.get('password')?.toString().trim();
-    const name = formData.get('name')?.toString().trim();
-    const role = formData.get('role')?.toString().trim() || 'manager';
-    const status = formData.get('status')?.toString().trim() || 'active';
+    const rawEmail = formData.get('email')?.toString().trim().toLowerCase();
+    const rawPassword = formData.get('password')?.toString().trim();
+    const rawName = formData.get('name')?.toString().trim();
+    const rawRole = formData.get('role')?.toString().trim() || 'manager';
+    const rawTitle = formData.get('title')?.toString().trim() || 'Management Staff';
+    const rawStatus = formData.get('status')?.toString().trim() || 'active';
+
+    // Anti-SQLi & Anti-XSS validation
+    const validation = validateAndSanitizeFormData({
+      email: rawEmail,
+      name: rawName,
+      title: rawTitle,
+    });
+
+    if (!validation.valid) {
+      setSecurityThreatAlert(validation);
+      triggerAudit('SECURITY_THREAT_BLOCKED', validation.error);
+      return;
+    }
+
+    const { sanitized } = validation;
 
     const permissions = [];
     if (formData.get('perm_menu') === 'on') permissions.push('menu');
@@ -497,24 +684,29 @@ export const AdminDashboard = ({
     if (formData.get('perm_staff') === 'on') permissions.push('staff');
     if (formData.get('perm_ambience') === 'on') permissions.push('ambience');
     if (formData.get('perm_audit') === 'on') permissions.push('audit');
-    if (role === 'superuser') permissions.push('all');
+    if (rawRole === 'superuser') permissions.push('all');
+
+    // Securely hash password if newly provided
+    let finalPassword = editingUser?.password || '1234';
+    if (rawPassword) {
+      finalPassword = await hashPassword(rawPassword);
+    }
 
     const userData = {
       id: editingUser?.id || `user-${Date.now()}`,
-      email,
-      password: password || editingUser?.password || '1234',
-      name,
-      role,
-      title: formData.get('title')?.toString().trim() || 'Management Staff',
+      email: sanitized.email,
+      password: finalPassword,
+      name: sanitized.name,
+      role: rawRole,
+      title: sanitized.title,
       permissions,
-      status,
+      status: rawStatus,
       createdAt: editingUser?.createdAt || new Date().toISOString().split('T')[0],
     };
 
     let updated;
     if (isAddingUser) {
-      // Check for duplicate email
-      if (users.some((u) => u.email.toLowerCase() === email)) {
+      if (users.some((u) => u.email.toLowerCase() === userData.email)) {
         alert('A user with this email already exists.');
         return;
       }
@@ -530,13 +722,57 @@ export const AdminDashboard = ({
     onUpdateUsers(updated);
     setEditingUser(null);
     setIsAddingUser(false);
+    setSecurityThreatAlert(null);
   };
 
-  // ================= 5. BULK PRICING =================
+  // ================= 5. SECURE PASSWORD CHANGE =================
+  const handleChangePasswordSubmit = async (e) => {
+    e.preventDefault();
+    setPasswordChangeError('');
+
+    const { currentPassword, newPassword, confirmPassword } = changePasswordForm;
+
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordChangeError('New password must be at least 6 characters long.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordChangeError('New passwords do not match. Please retype carefully.');
+      return;
+    }
+
+    // Find current user object
+    const userInDb = users.find((u) => u.email.toLowerCase() === currentUser.email.toLowerCase());
+    if (!userInDb) {
+      setPasswordChangeError('User account not found.');
+      return;
+    }
+
+    // Verify current password
+    const isCurrentValid = await verifyPassword(currentPassword, userInDb.password);
+    if (!isCurrentValid) {
+      setPasswordChangeError('Current password is incorrect.');
+      triggerAudit('SECURITY_PASSWORD_CHANGE_FAILED', `Failed attempt to change password for ${currentUser.email}`);
+      return;
+    }
+
+    // Hash and save new password
+    const newHash = await hashPassword(newPassword);
+    const updatedUsers = users.map((u) => (u.id === userInDb.id ? { ...u, password: newHash } : u));
+    onUpdateUsers(updatedUsers);
+
+    triggerAudit('SECURITY_PASSWORD_CHANGED', `Password successfully updated and hashed for ${currentUser.email}`);
+    setIsChangingPassword(false);
+    setChangePasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    showToast('Password changed successfully! Next login will require your new password.');
+  };
+
+  // ================= 6. BULK PRICING =================
   const handleSaveQuickPrices = () => {
     const updated = menuItems.map((item) => {
       if (priceFormState[item.id] !== undefined) {
-        return { ...item, price: Number(priceFormState[item.id]) };
+        return { ...item, price: Math.max(100, Number(priceFormState[item.id])) };
       }
       return item;
     });
@@ -547,14 +783,69 @@ export const AdminDashboard = ({
     setTimeout(() => setPriceSaveNotice(false), 2500);
   };
 
-  // ================= 6. SETTINGS =================
+  // ================= 7. SETTINGS =================
   const handleSaveSettings = (e) => {
     e.preventDefault();
+    const validation = validateAndSanitizeFormData({
+      restaurantName: settingsForm.restaurantName,
+      superuserEmail: settingsForm.superuserEmail,
+      whatsappNumber: settingsForm.whatsappNumber,
+    });
+
+    if (!validation.valid) {
+      setSecurityThreatAlert(validation);
+      triggerAudit('SECURITY_THREAT_BLOCKED', validation.error);
+      return;
+    }
+
     onUpdateSettings(settingsForm);
     triggerAudit('UPDATE_SETTINGS', 'Updated restaurant hotline, fees, or superuser email');
     setSettingsSavedNotice(true);
     showToast('Restaurant settings saved!');
     setTimeout(() => setSettingsSavedNotice(false), 2500);
+  };
+
+  // ================= 8. PRODUCTION CONFIG EXPORT / IMPORT =================
+  const handleDownloadBackupJson = () => {
+    const data = exportAllRestaurantData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `romee-restaurant-production-config-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    triggerAudit('BACKUP_EXPORTED', 'Superuser downloaded full production JSON config backup.');
+    showToast('Production backup downloaded!');
+  };
+
+  const handleImportBackupJson = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target.result);
+        const result = importAllRestaurantData(parsed);
+        if (result.success) {
+          onUpdateMenuItems(result.menu);
+          onUpdateSettings(result.settings);
+          onUpdateStaff(result.staff);
+          onUpdateAmbience(result.ambience);
+          onUpdateUsers(result.users);
+          triggerAudit('BACKUP_RESTORED', 'Superuser restored restaurant configuration from file.');
+          showToast('Data imported and restored successfully!');
+        } else {
+          alert('Failed to import backup: ' + result.error);
+        }
+      } catch (err) {
+        alert('Invalid JSON file format.');
+      }
+    };
+    reader.readAsText(file);
   };
 
   return (
@@ -579,11 +870,11 @@ export const AdminDashboard = ({
               <h2 className="font-serif text-lg sm:text-xl font-bold text-white flex items-center gap-2">
                 <span>ROMEE Executive Management Portal</span>
                 <span className="text-[10px] uppercase font-bold bg-mustard text-petrol-950 px-2 py-0.5 rounded-full">
-                  Live CRUD & Audit
+                  Production Hardened
                 </span>
               </h2>
               <p className="text-[11px] text-slate-400">
-                Authorized control center for Menu, Staff, Ambience Media, User Roles, and Audit Trail
+                SQLi & XSS Shield Active • Salted SHA-256 Auth • Live Role Access & Audit
               </p>
             </div>
           </div>
@@ -615,44 +906,24 @@ export const AdminDashboard = ({
           </div>
         )}
 
-        {/* Superuser Notification Ribbon (Whenever an update is logged) */}
-        {recentNotification && (
-          <div className="bg-petrol-950 border-b border-mustard/40 px-4 py-2.5 shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-slate-200">
-              <span className="w-2 h-2 rounded-full bg-mustard animate-ping shrink-0" />
-              <span>
-                <strong>Action Logged:</strong> {recentNotification.action} by <em>{recentNotification.userName}</em> ({recentNotification.details})
-              </span>
+        {/* Security Threat Alert Banner (If SQLi / XSS was caught and blocked) */}
+        {securityThreatAlert && (
+          <div className="bg-red-950 border-b border-red-500 px-4 py-3 shrink-0 flex items-start justify-between gap-3 text-xs text-red-200">
+            <div className="flex items-start gap-2.5">
+              <ShieldAlert className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-red-300 block font-bold">{securityThreatAlert.error}</strong>
+                <p className="text-[11px] text-red-400 mt-0.5 font-mono">
+                  Offending sequence blocked: "{securityThreatAlert.threatDetails?.offendingSnippet}"
+                </p>
+              </div>
             </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <a
-                href={createSuperuserWhatsAppUrl(recentNotification, settings.whatsappNumber)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 shadow-sm"
-                title="Send update alert to Superuser WhatsApp"
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                <span>Notify WhatsApp (07068371295)</span>
-              </a>
-
-              <a
-                href={createSuperuserMailtoUrl(recentNotification, settings.superuserEmail || 'salamiabdullahi247@gmail.com')}
-                className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1 shadow-sm"
-                title="Send update alert to Superuser Email"
-              >
-                <Mail className="w-3.5 h-3.5" />
-                <span>Notify Email</span>
-              </a>
-
-              <button
-                onClick={() => setRecentNotification(null)}
-                className="p-1 text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
+            <button
+              onClick={() => setSecurityThreatAlert(null)}
+              className="text-red-400 hover:text-white font-bold p-1"
+            >
+              ✕
+            </button>
           </div>
         )}
 
@@ -670,12 +941,16 @@ export const AdminDashboard = ({
                 <p className="text-xs text-slate-400 mt-1">
                   Superuser and Management Access Portal
                 </p>
+                <div className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 font-semibold mt-2 px-2.5 py-0.5 rounded-full bg-emerald-950 border border-emerald-800">
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>Brute-force protection & Anti-injection shield active</span>
+                </div>
               </div>
 
-              {/* Quick Fill Pills */}
+              {/* Quick Fill Preset Pills */}
               <div className="bg-petrol-900/80 p-3 rounded-2xl border border-petrol-800 text-left space-y-2">
                 <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
-                  Quick Sign-In Presets:
+                  Verified Administrator Credentials:
                 </span>
                 <div className="flex flex-col gap-1.5">
                   <button
@@ -707,7 +982,7 @@ export const AdminDashboard = ({
               <form onSubmit={handleLoginSubmit} className="space-y-4 text-left">
                 <div>
                   <label className="block text-slate-300 text-xs font-semibold mb-1">
-                    Email Address
+                    Superuser Email Address
                   </label>
                   <div className="relative">
                     <input
@@ -724,7 +999,7 @@ export const AdminDashboard = ({
 
                 <div>
                   <label className="block text-slate-300 text-xs font-semibold mb-1">
-                    Password / PIN
+                    Superuser Password / PIN
                   </label>
                   <div className="relative">
                     <input
@@ -748,9 +1023,10 @@ export const AdminDashboard = ({
 
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold text-xs uppercase tracking-wider shadow-lg transition-transform hover:scale-[1.01]"
+                  disabled={isLoggingIn}
+                  className="w-full py-3 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold text-xs uppercase tracking-wider shadow-lg transition-transform hover:scale-[1.01] disabled:opacity-50"
                 >
-                  Sign In to Management Portal
+                  {isLoggingIn ? 'Verifying Credentials...' : 'Sign In to Management Portal'}
                 </button>
               </form>
 
@@ -809,7 +1085,7 @@ export const AdminDashboard = ({
                     }`}
                   >
                     <UserCheck className="w-4 h-4" />
-                    <span>User Access Control ({users.length})</span>
+                    <span>User Roles ({users.length})</span>
                   </button>
                 )}
 
@@ -846,11 +1122,20 @@ export const AdminDashboard = ({
                   }`}
                 >
                   <Settings className="w-4 h-4" />
-                  <span>Settings</span>
+                  <span>Production Settings</span>
                 </button>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsChangingPassword(true)}
+                  className="text-xs text-mustard hover:text-white py-1.5 px-3 rounded-lg hover:bg-petrol-800 transition-colors flex items-center gap-1.5 whitespace-nowrap border border-mustard/30"
+                  title="Change Password"
+                >
+                  <Key className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Change Password</span>
+                </button>
+
                 <button
                   onClick={handleLogout}
                   className="text-xs text-red-400 hover:text-white py-1.5 px-3 rounded-lg hover:bg-red-950/60 transition-colors flex items-center gap-1.5 whitespace-nowrap border border-red-900/60"
@@ -1169,7 +1454,7 @@ export const AdminDashboard = ({
                 </div>
               )}
 
-              {/* TAB 4: USER ACCESS CONTROL (Superuser Only) */}
+              {/* TAB 4: USER ACCESS CONTROL */}
               {activeTab === 'users' && isSuperuser && (
                 <div className="space-y-6">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-petrol-950/70 p-4 rounded-2xl border border-petrol-800">
@@ -1266,7 +1551,7 @@ export const AdminDashboard = ({
                 </div>
               )}
 
-              {/* TAB 5: AUDIT TRAIL & HISTORY LOGS */}
+              {/* TAB 5: AUDIT TRAIL */}
               {activeTab === 'audit' && (
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-petrol-950/70 p-4 rounded-2xl border border-petrol-800">
@@ -1330,7 +1615,11 @@ export const AdminDashboard = ({
                         <div key={log.id} className="p-4 hover:bg-petrol-900/30 flex items-start justify-between gap-4 text-xs">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-mustard/20 text-mustard border border-mustard/40 font-mono">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider font-mono ${
+                                log.action.includes('SECURITY') || log.action.includes('LOCKED')
+                                  ? 'bg-red-950 text-red-300 border border-red-700'
+                                  : 'bg-mustard/20 text-mustard border border-mustard/40'
+                              }`}>
                                 {log.action}
                               </span>
                               <span className="font-bold text-white">
@@ -1439,15 +1728,17 @@ export const AdminDashboard = ({
                 </div>
               )}
 
-              {/* TAB 7: OUTLET SETTINGS */}
+              {/* TAB 7: PRODUCTION SETTINGS & SYNC TOOLS */}
               {activeTab === 'settings' && (
-                <div className="max-w-2xl mx-auto space-y-6">
+                <div className="max-w-3xl mx-auto space-y-6">
+                  
+                  {/* General Settings */}
                   <div className="bg-petrol-950/70 p-6 rounded-2xl border border-petrol-800 space-y-4">
-                    <h3 className="font-serif font-bold text-lg text-white">Restaurant & Notification Settings</h3>
+                    <h3 className="font-serif font-bold text-lg text-white">General Restaurant Configuration</h3>
 
                     <form onSubmit={handleSaveSettings} className="space-y-4 text-xs">
                       <div>
-                        <label className="block text-slate-300 font-semibold mb-1">Restaurant Name</label>
+                        <label className="block text-slate-300 font-semibold mb-1">Restaurant Legal Name</label>
                         <input
                           type="text"
                           value={settingsForm.restaurantName}
@@ -1464,23 +1755,23 @@ export const AdminDashboard = ({
                           onChange={(e) => setSettingsForm({ ...settingsForm, superuserEmail: e.target.value })}
                           className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
                         />
-                        <p className="text-[10px] text-slate-400 mt-1">Audit log reports and manager activity alerts will be sent here.</p>
+                        <p className="text-[10px] text-slate-400 mt-1">Audit log reports and security threat alerts will be routed here.</p>
                       </div>
 
                       <div>
-                        <label className="block text-slate-300 font-semibold mb-1">WhatsApp Order & Alert Number</label>
+                        <label className="block text-slate-300 font-semibold mb-1">WhatsApp Orders & Notifications Number</label>
                         <input
                           type="text"
                           value={settingsForm.whatsappNumber}
                           onChange={(e) => setSettingsForm({ ...settingsForm, whatsappNumber: e.target.value })}
                           className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
                         />
-                        <p className="text-[10px] text-slate-400 mt-1">Orders from the cart and emergency alerts compile directly to this phone number.</p>
+                        <p className="text-[10px] text-slate-400 mt-1">Client cart orders compile directly to this phone number.</p>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-slate-300 font-semibold mb-1">Dine-In Service Fee ({currency})</label>
+                          <label className="block text-slate-300 font-semibold mb-1">Dine-In Service Charge ({currency})</label>
                           <input
                             type="number"
                             value={settingsForm.serviceChargeDineIn}
@@ -1504,30 +1795,80 @@ export const AdminDashboard = ({
                         <p className="text-emerald-400 font-bold text-center">✓ Settings saved successfully!</p>
                       )}
 
-                      <div className="pt-2 flex items-center justify-between">
+                      <div className="pt-2">
                         <button
                           type="submit"
                           className="px-6 py-2.5 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold uppercase tracking-wider text-xs shadow-md"
                         >
                           Save Settings
                         </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (window.confirm('Reset all menu items, staff, users, and settings back to factory defaults?')) {
-                              onResetDefaults();
-                              onClose();
-                            }
-                          }}
-                          className="text-xs text-red-400 hover:underline flex items-center gap-1"
-                        >
-                          <RefreshCcw className="w-3.5 h-3.5" />
-                          <span>Reset to Factory Defaults</span>
-                        </button>
                       </div>
                     </form>
                   </div>
+
+                  {/* Production Deployment & Data Backup Tools */}
+                  <div className="bg-petrol-950/70 p-6 rounded-2xl border border-mustard/30 space-y-4">
+                    <div className="flex items-center gap-2 text-mustard">
+                      <Download className="w-5 h-5" />
+                      <h3 className="font-serif font-bold text-base text-white">Production Data Backup & Multi-Device Sync</h3>
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Download your entire customized restaurant configuration (dishes, prices, staff, media, settings) as a verified JSON file, or restore it on any other phone, tablet, or browser.
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-3 pt-2">
+                      <button
+                        onClick={handleDownloadBackupJson}
+                        className="px-4 py-2.5 rounded-xl bg-petrol-900 hover:bg-petrol-800 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 border border-petrol-700 shadow-sm"
+                      >
+                        <Download className="w-4 h-4 text-mustard" />
+                        <span>Download Production Backup (.json)</span>
+                      </button>
+
+                      <label className="px-4 py-2.5 rounded-xl bg-petrol-900 hover:bg-petrol-800 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 border border-petrol-700 shadow-sm cursor-pointer">
+                        <Upload className="w-4 h-4 text-emerald-400" />
+                        <span>Restore Data from Backup</span>
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={handleImportBackupJson}
+                          className="hidden"
+                        />
+                      </label>
+
+                      <button
+                        onClick={() => setShowCodeExportModal(true)}
+                        className="px-4 py-2.5 rounded-xl bg-petrol-900 hover:bg-petrol-800 text-mustard font-bold text-xs uppercase tracking-wider flex items-center gap-2 border border-mustard/40 shadow-sm"
+                      >
+                        <FileText className="w-4 h-4" />
+                        <span>Export Live Code Snippet</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Factory Reset */}
+                  <div className="bg-red-950/30 p-6 rounded-2xl border border-red-900/40 flex items-center justify-between gap-4">
+                    <div>
+                      <h4 className="font-serif font-bold text-sm text-red-300">Reset System to Defaults</h4>
+                      <p className="text-xs text-slate-400">Restores all original menu items, default staff, and baseline settings.</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm('WARNING: Reset all menu items, staff profiles, and settings back to factory defaults?')) {
+                          onResetDefaults();
+                          onClose();
+                        }
+                      }}
+                      className="px-4 py-2 rounded-xl bg-red-950 hover:bg-red-900 text-red-300 font-bold text-xs uppercase tracking-wider border border-red-800 flex items-center gap-1.5 shrink-0"
+                    >
+                      <RefreshCcw className="w-3.5 h-3.5" />
+                      <span>Factory Reset</span>
+                    </button>
+                  </div>
+
                 </div>
               )}
 
@@ -2187,10 +2528,9 @@ export const AdminDashboard = ({
                   <input
                     type="text"
                     name="password"
-                    defaultValue={editingUser?.password || '1234'}
-                    placeholder="Set password"
+                    placeholder={editingUser ? "Leave blank to keep unchanged" : "Set password"}
                     className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
-                    required
+                    required={!editingUser}
                   />
                 </div>
               </div>
@@ -2319,6 +2659,142 @@ export const AdminDashboard = ({
               >
                 Yes, Delete Permanently
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL 6: CHANGE PASSWORD MODAL ================= */}
+      {isChangingPassword && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div 
+            onClick={() => setIsChangingPassword(false)} 
+            className="fixed inset-0 bg-petrol-950/90 backdrop-blur-md" 
+          />
+          <div className="relative w-full max-w-md bg-petrol-900 border border-mustard/40 rounded-3xl p-6 z-10 text-white space-y-4 shadow-2xl text-left">
+            <div className="flex items-center justify-between border-b border-petrol-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Key className="w-5 h-5 text-mustard" />
+                <h3 className="font-serif font-bold text-lg text-white">Update Password</h3>
+              </div>
+              <button
+                onClick={() => setIsChangingPassword(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePasswordSubmit} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Current Password *</label>
+                <input
+                  type="password"
+                  value={changePasswordForm.currentPassword}
+                  onChange={(e) => setChangePasswordForm({ ...changePasswordForm, currentPassword: e.target.value })}
+                  placeholder="Enter current password"
+                  className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">New Secure Password *</label>
+                <input
+                  type="password"
+                  value={changePasswordForm.newPassword}
+                  onChange={(e) => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })}
+                  placeholder="Minimum 6 characters"
+                  className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Confirm New Password *</label>
+                <input
+                  type="password"
+                  value={changePasswordForm.confirmPassword}
+                  onChange={(e) => setChangePasswordForm({ ...changePasswordForm, confirmPassword: e.target.value })}
+                  placeholder="Re-enter new password"
+                  className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                  required
+                />
+              </div>
+
+              {passwordChangeError && (
+                <div className="p-2.5 rounded-xl bg-red-950/80 border border-red-500/40 text-red-300 text-xs">
+                  {passwordChangeError}
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-petrol-800 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsChangingPassword(false)}
+                  className="px-4 py-2 rounded-xl text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-black text-xs uppercase tracking-wider shadow-md"
+                >
+                  Save New Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL 7: CODE EXPORT FOR PERMANENT PRODUCTION BUILD ================= */}
+      {showCodeExportModal && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div 
+            onClick={() => setShowCodeExportModal(false)} 
+            className="fixed inset-0 bg-petrol-950/90 backdrop-blur-md" 
+          />
+          <div className="relative w-full max-w-3xl bg-petrol-900 border border-mustard/40 rounded-3xl p-6 z-10 text-white space-y-4 shadow-2xl text-left max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-petrol-800 pb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-mustard" />
+                <h3 className="font-serif font-bold text-lg text-white">Permanent Production Code Export</h3>
+              </div>
+              <button
+                onClick={() => setShowCodeExportModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 shrink-0">
+              To bake your customized dishes directly into the website's source code for every visitor across the internet (even without browser local storage), copy the code below into <code className="text-mustard font-mono">src/data/initialMenu.js</code>:
+            </p>
+
+            <div className="flex-1 overflow-y-auto bg-petrol-950 p-4 rounded-2xl border border-petrol-800 font-mono text-[11px] text-slate-300 select-all">
+              <pre>{`export const INITIAL_MENU_ITEMS = ${JSON.stringify(menuItems, null, 2)};`}</pre>
+            </div>
+
+            <div className="pt-3 border-t border-petrol-800 flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-slate-400">
+                {menuItems.length} active dishes ready for permanent production deployment
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`export const INITIAL_MENU_ITEMS = ${JSON.stringify(menuItems, null, 2)};`);
+                    setCopiedCodeNotice(true);
+                    setTimeout(() => setCopiedCodeNotice(false), 2500);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md"
+                >
+                  {copiedCodeNotice ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <span>{copiedCodeNotice ? 'Copied to Clipboard!' : 'Copy Code Snippet'}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
