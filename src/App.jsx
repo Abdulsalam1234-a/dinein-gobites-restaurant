@@ -10,6 +10,7 @@ import { WhatsAppOrderModal } from './components/WhatsAppOrderModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { ChatbotWidget } from './components/ChatbotWidget';
 import { WelcomeModal } from './components/WelcomeModal';
+import { ThemeAmbientEffects } from './components/ThemeAmbientEffects';
 import { getActiveTheme } from './utils/theme';
 
 // Pages
@@ -190,17 +191,38 @@ export default function App() {
     setAuditLogs(defaultLogs);
   };
 
-  const currentTheme = getActiveTheme(settings.theme || 'classic');
+  const activeThemeId = settings.theme || 'classic';
+  const currentTheme = getActiveTheme(activeThemeId);
+
+  // Synchronize active theme attribute to HTML and BODY elements
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', activeThemeId);
+    document.body.setAttribute('data-theme', activeThemeId);
+  }, [activeThemeId]);
 
   return (
     <BrowserRouter>
       <ScrollToTop />
 
-      <div className="min-h-screen bg-[#F4F6F9] text-slate-800 flex flex-col font-sans selection:bg-mustard selection:text-petrol-950">
+      {/* Floating Theme Particle Effects (Bats for Halloween, Snow for Christmas, Hearts for Valentine, etc.) */}
+      <ThemeAmbientEffects themeId={activeThemeId} />
+
+      <div 
+        className="min-h-screen text-slate-800 flex flex-col font-sans selection:bg-mustard selection:text-petrol-950 transition-colors duration-500 relative"
+        data-theme={activeThemeId}
+      >
         
         {/* Seasonal Theme Celebration Banner */}
         {currentTheme.bannerText && (
-          <div className={`py-2 px-4 text-center text-xs font-bold tracking-wide flex items-center justify-center gap-2 select-none shadow-sm transition-colors duration-300 ${currentTheme.bannerBg}`}>
+          <div 
+            className="py-2 px-4 text-center text-xs font-bold tracking-wide flex items-center justify-center gap-2 select-none shadow-sm transition-colors duration-500"
+            style={{
+              backgroundColor: 'var(--theme-banner-bg)',
+              color: 'var(--theme-banner-text)',
+              borderBottom: '1px solid var(--color-card-border)',
+            }}
+          >
+            <span className="text-base">{currentTheme.icon}</span>
             <span>{currentTheme.bannerText}</span>
           </div>
         )}

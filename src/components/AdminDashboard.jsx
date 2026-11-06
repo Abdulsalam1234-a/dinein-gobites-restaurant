@@ -1762,7 +1762,14 @@ export const AdminDashboard = ({
                           return (
                             <div
                               key={th.id}
-                              onClick={() => setSettingsForm({ ...settingsForm, theme: th.id })}
+                              onClick={() => {
+                                const updated = { ...settingsForm, theme: th.id };
+                                setSettingsForm(updated);
+                                onUpdateSettings(updated);
+                                document.documentElement.setAttribute('data-theme', th.id);
+                                document.body.setAttribute('data-theme', th.id);
+                                showToast(`Theme switched to ${th.name}!`);
+                              }}
                               className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between text-left select-none ${
                                 isSelected
                                   ? 'bg-petrol-900 border-mustard shadow-md ring-2 ring-mustard/40'

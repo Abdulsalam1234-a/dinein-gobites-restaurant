@@ -2,11 +2,171 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ══════════════════════════════════════════════════════════════════
+   1. DYNAMIC SEASONAL THEMES CSS VARIABLES ENGINE
+   Values are space-separated RGB numbers to support Tailwind opacity (e.g. bg-petrol-900/80)
+   ══════════════════════════════════════════════════════════════════ */
+
+:root,
+[data-theme="classic"] {
+  --color-petrol-950: 5 34 46;      /* #05222E */
+  --color-petrol-900: 7 51 70;      /* #073346 */
+  --color-petrol-800: 14 93 126;    /* #0E5D7E */
+  --color-petrol-700: 20 116 157;   /* #14749D */
+  --color-petrol-600: 27 142 191;   /* #1B8EBF */
+
+  --color-mustard: 244 183 40;      /* #F4B728 - Royal Amber Gold */
+  --color-mustard-hover: 226 165 27;/* #E2A51B */
+  --color-mustard-light: 253 230 138;/* #FDE68A */
+
+  --color-sage: 39 164 114;         /* #27A472 - Emerald Leaf */
+  --color-sage-hover: 31 140 96;    /* #1F8C60 */
+  --color-sage-light: 209 250 229;  /* #D1FAE5 */
+
+  --color-page-bg: #F4F6F9;
+  --color-page-text: #1E293B;
+  --color-card-bg: #FFFFFF;
+  --color-card-border: #E2E8F0;
+  --theme-glow: rgba(244, 183, 40, 0.35);
+  --theme-banner-bg: #05222E;
+  --theme-banner-text: #F4B728;
+}
+
+/* 🎃 HALLOWEEN SPOOKTACULAR */
+[data-theme="halloween"] {
+  --color-petrol-950: 10 8 18;      /* #0A0812 - Deep Void */
+  --color-petrol-900: 22 17 38;     /* #161126 - Haunted Midnight Purple-Charcoal */
+  --color-petrol-800: 45 32 75;     /* #2D204B - Witch Obsidian */
+  --color-petrol-700: 76 46 128;    /* #4C2E80 - Potion Violet */
+  --color-petrol-600: 109 63 181;   /* #6D3FB5 - Spectral Glow */
+
+  --color-mustard: 255 111 0;       /* #FF6F00 - Electric Glowing Pumpkin Flame! */
+  --color-mustard-hover: 230 81 0;  /* #E65100 - Fiery Ember */
+  --color-mustard-light: 254 215 170;/* #FED7AA */
+
+  --color-sage: 147 51 234;        /* #9333EA - Witch Cauldron Purple */
+  --color-sage-hover: 126 34 206;   /* #7E22CE */
+  --color-sage-light: 243 232 255;  /* #F3E8FF */
+
+  --color-page-bg: #0C0A14;         /* Spooky Dark Mode Canvas */
+  --color-page-text: #F8FAFC;
+  --color-card-bg: #161224;
+  --color-card-border: rgba(255, 111, 0, 0.3);
+  --theme-glow: rgba(255, 111, 0, 0.45);
+  --theme-banner-bg: #140E24;
+  --theme-banner-text: #FB923C;
+}
+
+/* ❤️ VALENTINE & ROMANCE SEASON */
+[data-theme="valentine"] {
+  --color-petrol-950: 59 2 18;      /* #3B0212 - Deep Wine Velvet */
+  --color-petrol-900: 94 10 35;     /* #5E0A23 - Royal Romantic Ruby */
+  --color-petrol-800: 136 19 55;    /* #881337 - Velvet Rose Red */
+  --color-petrol-700: 174 24 67;    /* #AE1843 - Rich Crimson */
+  --color-petrol-600: 219 39 88;    /* #DB2758 - Passion Pink */
+
+  --color-mustard: 244 63 94;       /* #F43F5E - Radiant Rose Passion */
+  --color-mustard-hover: 225 29 72; /* #E11D48 - Deep Ruby */
+  --color-mustard-light: 254 205 211;/* #FECDD3 - Soft Blush */
+
+  --color-sage: 251 113 133;        /* #FB7185 - Strawberry Champagne */
+  --color-sage-hover: 244 63 94;    /* #F43F5E */
+  --color-sage-light: 255 228 230;  /* #FFE4E6 */
+
+  --color-page-bg: #FFF1F2;         /* Soft Romantic Rose Tint */
+  --color-page-text: #3B0717;
+  --color-card-bg: #FFFFFF;
+  --color-card-border: rgba(244, 63, 94, 0.25);
+  --theme-glow: rgba(244, 63, 94, 0.35);
+  --theme-banner-bg: #4C0519;
+  --theme-banner-text: #FECDD3;
+}
+
+/* 🇳🇬 INDEPENDENCE & NAIJA FIESTA */
+[data-theme="naija"] {
+  --color-petrol-950: 0 56 27;      /* #00381B - Deepest Nigerian Forest Green */
+  --color-petrol-900: 0 104 55;     /* #006837 - National Flag Green */
+  --color-petrol-800: 0 135 81;     /* #008751 - Vibrant Naija Emerald */
+  --color-petrol-700: 14 159 110;   /* #0E9F6E - Mint Emerald */
+  --color-petrol-600: 49 196 141;   /* #31C48D - Bright Naija Green */
+
+  --color-mustard: 245 158 11;      /* #F59E0B - Golden Sunshine / Suya Ember */
+  --color-mustard-hover: 217 119 6; /* #D97706 */
+  --color-mustard-light: 254 243 199;/* #FEF3C7 */
+
+  --color-sage: 5 150 105;          /* #059669 - Plantain Green */
+  --color-sage-hover: 4 120 87;     /* #047857 */
+  --color-sage-light: 209 250 229;  /* #D1FAE5 */
+
+  --color-page-bg: #F0FDF4;         /* Fresh Celebration Mint */
+  --color-page-text: #064E3B;
+  --color-card-bg: #FFFFFF;
+  --color-card-border: rgba(0, 135, 81, 0.25);
+  --theme-glow: rgba(0, 135, 81, 0.35);
+  --theme-banner-bg: #00381B;
+  --theme-banner-text: #FEF08A;
+}
+
+/* 🌙 SALAH & EID CELEBRATIONS */
+[data-theme="salah"] {
+  --color-petrol-950: 2 44 34;      /* #022C22 - Midnight Mosque Green */
+  --color-petrol-900: 6 78 59;      /* #064E3B - Imperial Islamic Emerald */
+  --color-petrol-800: 4 120 87;     /* #047857 - Royal Mosque Green */
+  --color-petrol-700: 5 150 105;    /* #059669 - Crescent Green */
+  --color-petrol-600: 16 185 129;   /* #10B981 - Oasis Light */
+
+  --color-mustard: 245 158 11;      /* #F59E0B - Celestial Crescent Gold */
+  --color-mustard-hover: 217 119 6; /* #D97706 - Deep Arabic Gold */
+  --color-mustard-light: 254 243 199;/* #FEF3C7 - Lantern Glow */
+
+  --color-sage: 16 185 129;         /* #10B981 - Oasis Emerald */
+  --color-sage-hover: 5 150 105;    /* #059669 */
+  --color-sage-light: 236 253 245;  /* #ECFDF5 */
+
+  --color-page-bg: #FAF8F5;         /* Regal Warm Parchment */
+  --color-page-text: #163326;
+  --color-card-bg: #FFFFFF;
+  --color-card-border: rgba(217, 119, 6, 0.3);
+  --theme-glow: rgba(245, 158, 11, 0.4);
+  --theme-banner-bg: #022C22;
+  --theme-banner-text: #FBBF24;
+}
+
+/* 🎄 CHRISTMAS & NEW YEAR FESTIVITIES */
+[data-theme="christmas"] {
+  --color-petrol-950: 69 10 10;     /* #450A0A - Deep Winter Crimson */
+  --color-petrol-900: 127 29 29;    /* #7F1D1D - Santa Holiday Red */
+  --color-petrol-800: 153 27 27;    /* #991B1B - Festive Holly Crimson */
+  --color-petrol-700: 185 28 28;    /* #B91C1C - Berry Red */
+  --color-petrol-600: 220 38 38;    /* #DC2626 - Holiday Poppy */
+
+  --color-mustard: 245 158 11;      /* #F59E0B - Christmas Star Gold */
+  --color-mustard-hover: 217 119 6; /* #D97706 - Warm Hearth Gold */
+  --color-mustard-light: 254 243 199;/* #FEF3C7 */
+
+  --color-sage: 21 128 61;          /* #15803D - Holly Pine Evergreen */
+  --color-sage-hover: 22 101 52;    /* #166534 - Deep Fir Tree */
+  --color-sage-light: 220 252 231;  /* #DCFCE7 - Mistletoe */
+
+  --color-page-bg: #FEF2F2;         /* Cozy Snowy Warm White */
+  --color-page-text: #450A0A;
+  --color-card-bg: #FFFFFF;
+  --color-card-border: rgba(153, 27, 27, 0.25);
+  --theme-glow: rgba(220, 38, 38, 0.35);
+  --theme-banner-bg: #450A0A;
+  --theme-banner-text: #FDE68A;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   2. GLOBAL THEME APPLICATION RULES
+   ══════════════════════════════════════════════════════════════════ */
+
 @layer base {
   body {
-    background-color: #F4F6F9;
-    color: #1E293B;
+    background-color: var(--color-page-bg);
+    color: var(--color-page-text);
     font-family: 'Plus Jakarta Sans', sans-serif;
+    transition: background-color 0.4s ease, color 0.4s ease;
   }
 
   h1, h2, h3, h4, .font-serif {
@@ -14,71 +174,165 @@
   }
 }
 
+/* Specific styling for Halloween Dark Mode cards */
+[data-theme="halloween"] .bg-white {
+  background-color: #171326 !important;
+  border-color: rgba(255, 111, 0, 0.25) !important;
+  color: #F8FAFC !important;
+}
+
+[data-theme="halloween"] .text-slate-900,
+[data-theme="halloween"] .text-slate-800 {
+  color: #F8FAFC !important;
+}
+
+[data-theme="halloween"] .text-slate-700,
+[data-theme="halloween"] .text-slate-600 {
+  color: #CBD5E1 !important;
+}
+
+[data-theme="halloween"] .text-slate-500 {
+  color: #94A3B8 !important;
+}
+
+[data-theme="halloween"] .bg-slate-50,
+[data-theme="halloween"] .bg-slate-100 {
+  background-color: #211B33 !important;
+  border-color: #33274D !important;
+  color: #E2E8F0 !important;
+}
+
+[data-theme="halloween"] .border-slate-200,
+[data-theme="halloween"] .border-slate-100 {
+  border-color: rgba(255, 111, 0, 0.2) !important;
+}
+
+[data-theme="halloween"] .bg-\[\#F4F6F9\] {
+  background-color: #0C0A14 !important;
+}
+
+/* Specific styling for Valentine Soft-Rose mode */
+[data-theme="valentine"] .bg-\[\#F4F6F9\] {
+  background-color: #FFF1F2 !important;
+}
+
+[data-theme="valentine"] .border-slate-200 {
+  border-color: rgba(244, 63, 94, 0.2) !important;
+}
+
+/* Specific styling for Naija Mint mode */
+[data-theme="naija"] .bg-\[\#F4F6F9\] {
+  background-color: #F0FDF4 !important;
+}
+
+[data-theme="naija"] .border-slate-200 {
+  border-color: rgba(0, 135, 81, 0.2) !important;
+}
+
+/* Specific styling for Salah Ivory mode */
+[data-theme="salah"] .bg-\[\#F4F6F9\] {
+  background-color: #FAF8F5 !important;
+}
+
+[data-theme="salah"] .border-slate-200 {
+  border-color: rgba(217, 119, 6, 0.25) !important;
+}
+
+/* Specific styling for Christmas Snowy mode */
+[data-theme="christmas"] .bg-\[\#F4F6F9\] {
+  background-color: #FEF2F2 !important;
+}
+
+[data-theme="christmas"] .border-slate-200 {
+  border-color: rgba(153, 27, 27, 0.2) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   3. ANIMATED SEASONAL AMBIENT EFFECTS
+   ══════════════════════════════════════════════════════════════════ */
+
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(4deg);
+  }
+}
+
+@keyframes fallSnow {
+  0% {
+    transform: translateY(-10vh) translateX(0px) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.8;
+  }
+  85% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(105vh) translateX(40px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+@keyframes floatHearts {
+  0% {
+    transform: translateY(105vh) translateX(0px) scale(0.8) rotate(-5deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.7;
+  }
+  80% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(-10vh) translateX(-35px) scale(1.1) rotate(15deg);
+    opacity: 0;
+  }
+}
+
+.animate-float-gentle {
+  animation: floatGentle 4s ease-in-out infinite;
+}
+
+.theme-particle-snow {
+  position: fixed;
+  top: -20px;
+  user-select: none;
+  pointer-events: none;
+  z-index: 35;
+  animation: fallSnow linear infinite;
+}
+
+.theme-particle-heart {
+  position: fixed;
+  bottom: -20px;
+  user-select: none;
+  pointer-events: none;
+  z-index: 35;
+  animation: floatHearts linear infinite;
+}
+
+/* Hero curvature and gradient buttons */
 @layer utilities {
   .hero-curved-bottom {
     border-bottom-left-radius: 48px;
     border-bottom-right-radius: 48px;
-  }
-
-  .dotted-leader {
-    border-bottom: 2px dotted #CBD5E1;
-  }
-
-  .halo-ring-green {
-    box-shadow: 0 0 0 16px #A7F3D0;
-  }
-
-  .halo-ring-yellow {
-    box-shadow: 0 0 0 32px #FDE68A;
+    box-shadow: 0 20px 45px -10px var(--theme-glow);
   }
 
   .gold-gradient-btn {
-    background: linear-gradient(135deg, #F4B728 0%, #E2A51B 50%, #C9A84C 100%);
-    color: #05222E;
+    background: linear-gradient(135deg, rgb(var(--color-mustard)) 0%, rgb(var(--color-mustard-hover)) 100%);
+    color: rgb(var(--color-petrol-950));
     font-weight: 700;
     transition: all 0.25s ease;
   }
 
   .gold-gradient-btn:hover {
-    background: linear-gradient(135deg, #FBD36E 0%, #F4B728 50%, #E2A51B 100%);
-    box-shadow: 0 8px 20px -4px rgba(244, 183, 40, 0.4);
+    box-shadow: 0 10px 25px -4px var(--theme-glow);
     transform: translateY(-1px);
   }
-
-  .gold-gradient-text {
-    background: linear-gradient(135deg, #FFF0B8 0%, #F4B728 50%, #C9A84C 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  .bg-glass {
-    background: rgba(7, 51, 70, 0.85);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-  
-  .bg-glass-card {
-    background: linear-gradient(135deg, rgba(7, 51, 70, 0.9) 0%, rgba(5, 34, 46, 0.95) 100%);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-  }
-}
-
-/* Custom sleek scrollbar */
-::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-}
-
-::-webkit-scrollbar-track {
-  background: #F1F5F9;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
 }

@@ -8,12 +8,12 @@ export default {
     extend: {
       colors: {
         petrol: {
-          950: '#05222E',
-          900: '#073346',
-          DEFAULT: '#0B4E6A',
-          800: '#0E5D7E',
-          700: '#14749D',
-          600: '#1B8EBF',
+          950: 'rgb(var(--color-petrol-950) / <alpha-value>)',
+          900: 'rgb(var(--color-petrol-900) / <alpha-value>)',
+          DEFAULT: 'rgb(var(--color-petrol-900) / <alpha-value>)',
+          800: 'rgb(var(--color-petrol-800) / <alpha-value>)',
+          700: 'rgb(var(--color-petrol-700) / <alpha-value>)',
+          600: 'rgb(var(--color-petrol-600) / <alpha-value>)',
         },
         navy: {
           950: '#030B18',
@@ -36,14 +36,14 @@ export default {
           900: '#46340D',
         },
         mustard: {
-          DEFAULT: '#F4B728',
-          hover: '#E2A51B',
-          light: '#FDE68A',
+          DEFAULT: 'rgb(var(--color-mustard) / <alpha-value>)',
+          hover: 'rgb(var(--color-mustard-hover) / <alpha-value>)',
+          light: 'rgb(var(--color-mustard-light) / <alpha-value>)',
         },
         sage: {
-          DEFAULT: '#27A472',
-          hover: '#1F8C60',
-          light: '#D1FAE5',
+          DEFAULT: 'rgb(var(--color-sage) / <alpha-value>)',
+          hover: 'rgb(var(--color-sage-hover) / <alpha-value>)',
+          light: 'rgb(var(--color-sage-light) / <alpha-value>)',
         }
       },
       fontFamily: {
