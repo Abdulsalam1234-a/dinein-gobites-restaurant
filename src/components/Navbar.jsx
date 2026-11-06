@@ -53,20 +53,29 @@ export const Navbar = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           
-          {/* Brand Logo */}
+          {/* Brand Logo with Official Restaurant Emblem */}
           <Link 
             to="/" 
-            className="flex items-center gap-2.5 cursor-pointer select-none group"
+            className="flex items-center gap-3 cursor-pointer select-none group"
           >
-            <div className="w-9 h-9 rounded-full bg-mustard flex items-center justify-center text-petrol-950 font-black shadow-md group-hover:scale-105 transition-transform">
-              <UtensilsCrossed className="w-5 h-5" />
+            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl overflow-hidden bg-black/80 border border-mustard/40 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform p-1">
+              <img 
+                src="/images/romee-logo.jpg" 
+                alt="ROMEE Eatery Logo" 
+                className="w-full h-full object-contain"
+              />
             </div>
-            <div className="flex items-baseline gap-1">
-              <span className="font-serif text-2xl font-bold tracking-tight text-white">
-                ROMEE
-              </span>
-              <span className="text-xs font-bold uppercase tracking-wider text-mustard bg-petrol-950/60 px-2 py-0.5 rounded-full border border-mustard/30">
-                Go-Bite
+            <div className="flex flex-col text-left">
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-serif text-2xl font-bold tracking-tight text-white group-hover:text-mustard transition-colors">
+                  ROMEE
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-mustard bg-petrol-950/80 px-2 py-0.5 rounded-full border border-mustard/30">
+                  Go-Bite
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-300 font-medium italic -mt-0.5 tracking-tight hidden sm:inline">
+                ...serving the difference
               </span>
             </div>
           </Link>

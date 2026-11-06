@@ -40,9 +40,26 @@ export const Footer = ({ onOpenAdmin, settings = {} }) => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 mb-12 items-start text-left">
           
-          {/* Col 1: Newsletter & Socials - Matching Design (lg:col-span-4) */}
+          {/* Col 1: Brand & Newsletter (lg:col-span-4) */}
           <div className="lg:col-span-4 space-y-4">
-            <h3 className="font-serif text-lg font-bold text-white">
+            {/* Brand Logo & Tagline */}
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-2xl overflow-hidden bg-black/80 border border-mustard/30 p-1 shrink-0 shadow-md">
+                <img 
+                  src="/images/romee-logo.jpg" 
+                  alt="ROMEE Eatery Logo" 
+                  className="w-full h-full object-contain" 
+                />
+              </div>
+              <div>
+                <h3 className="font-serif text-xl font-bold text-white tracking-wide">
+                  ROMEE <span className="text-mustard text-xs font-sans font-bold uppercase tracking-wider bg-petrol-950 px-2 py-0.5 rounded-full border border-mustard/20">Go-Bite</span>
+                </h3>
+                <p className="text-[11px] text-slate-400 italic">...serving the difference</p>
+              </div>
+            </div>
+
+            <h3 className="font-serif text-base font-bold text-white pt-1">
               Subscribe Our <span className="text-sage">Newsletter</span>
             </h3>
             

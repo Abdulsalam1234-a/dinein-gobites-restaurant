@@ -178,12 +178,14 @@ export const ChatbotWidget = ({
       <div className="fixed bottom-6 right-6 z-40">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="relative group flex items-center gap-2.5 px-4 py-3 rounded-full bg-gradient-to-r from-gold-500 via-gold to-gold-600 text-navy-950 font-extrabold shadow-gold-md hover:shadow-gold-lg transition-all transform hover:scale-105"
+          className="relative group flex items-center gap-2.5 px-3.5 sm:px-4 py-2.5 rounded-full bg-gradient-to-r from-gold-500 via-gold to-gold-600 text-navy-950 font-extrabold shadow-gold-md hover:shadow-gold-lg transition-all transform hover:scale-105"
         >
           {/* Subtle pulsating outer ring */}
           <span className="absolute -inset-1 rounded-full bg-gold/40 animate-ping opacity-60 pointer-events-none" />
 
-          <Bot className="w-5 h-5 text-navy-950" />
+          <div className="w-8 h-8 rounded-full overflow-hidden bg-black p-0.5 border border-navy-950 shrink-0 shadow-sm">
+            <img src="/images/romee-logo.jpg" alt="Chef Romee" className="w-full h-full object-contain" />
+          </div>
           <span className="text-xs tracking-wider uppercase hidden sm:inline font-bold">
             Ask Chef Romee
           </span>
@@ -198,8 +200,8 @@ export const ChatbotWidget = ({
           {/* Header */}
           <div className="p-4 bg-navy-950 border-b border-gold/25 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-full bg-gold/20 border border-gold/40 flex items-center justify-center text-gold">
-                <Bot className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-2xl bg-black border border-gold/40 flex items-center justify-center p-0.5 overflow-hidden shadow-md">
+                <img src="/images/romee-logo.jpg" alt="Chef Romee" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h3 className="font-serif text-sm font-bold text-white flex items-center gap-1.5">
@@ -208,7 +210,7 @@ export const ChatbotWidget = ({
                     Online
                   </span>
                 </h3>
-                <p className="text-[10px] text-gold-300">ROMEE Go-Bite Dining Concierge</p>
+                <p className="text-[10px] text-gold-300">...serving the difference</p>
               </div>
             </div>
 

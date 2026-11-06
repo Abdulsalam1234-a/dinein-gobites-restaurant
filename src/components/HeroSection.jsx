@@ -13,9 +13,13 @@ export const HeroSection = ({ onExploreFood, onOpenWhatsAppGuide }) => {
         {/* Left Text Content - Exact Match to Design */}
         <div className="lg:col-span-7 space-y-6 text-left">
           
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-petrol-950/60 border border-mustard/30 text-mustard text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
+          <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-petrol-950/70 border border-mustard/40 text-mustard text-xs font-semibold shadow-sm">
+            <div className="w-5 h-5 rounded-full overflow-hidden bg-black/80 p-0.5 shrink-0 flex items-center justify-center">
+              <img src="/images/romee-logo.jpg" alt="Logo" className="w-full h-full object-contain" />
+            </div>
             <span>Welcome to ROMEE Go-Bite Eatery</span>
+            <span className="text-white/40 hidden sm:inline">•</span>
+            <span className="text-white/80 italic text-[11px] hidden sm:inline">...serving the difference</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif font-extrabold tracking-tight leading-[1.15] text-white">
@@ -84,6 +88,17 @@ export const HeroSection = ({ onExploreFood, onOpenWhatsAppGuide }) => {
             </div>
             <div className="absolute top-1/2 -left-6 -translate-y-1/2 w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center shadow-md text-base">
               🥬
+            </div>
+
+            {/* Official Brand Stamp Badge */}
+            <div className="absolute -bottom-5 -left-4 bg-petrol-950/90 backdrop-blur-md p-2 rounded-2xl border border-mustard/40 shadow-xl flex items-center gap-2.5 z-20">
+              <div className="w-10 h-10 rounded-xl overflow-hidden bg-black flex items-center justify-center p-1 border border-mustard/30 shrink-0">
+                <img src="/images/romee-logo.jpg" alt="Official Logo" className="w-full h-full object-contain" />
+              </div>
+              <div className="text-left pr-1.5 hidden sm:block">
+                <span className="text-[10px] text-mustard font-black uppercase tracking-wider block">Official Eatery</span>
+                <span className="text-[9px] text-white/80 italic block">...serving the difference</span>
+              </div>
             </div>
 
           </div>

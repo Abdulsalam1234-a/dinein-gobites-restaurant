@@ -29,6 +29,14 @@ export const AboutPage = ({ staffMembers = [] }) => {
         <div className="absolute top-10 right-10 w-96 h-96 bg-petrol-700/20 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-4xl mx-auto text-center space-y-4">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto rounded-3xl bg-black/85 border-2 border-mustard/40 p-2 shadow-2xl overflow-hidden mb-2">
+            <img 
+              src="/images/romee-logo.jpg" 
+              alt="ROMEE Official Emblem" 
+              className="w-full h-full object-contain"
+            />
+          </div>
+
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-petrol-950/70 border border-mustard/30 text-mustard text-xs font-bold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
             <span>Our Heritage & Vision</span>

@@ -90,10 +90,18 @@ export const WelcomeModal = ({ settings }) => {
             <X className="w-5 h-5" />
           </button>
 
-          {/* Theme badge */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-xs font-bold text-amber-300 mb-3">
-            <span className="text-base">{theme.icon}</span>
-            <span>{theme.name}</span>
+          {/* Brand Logo & Theme badge */}
+          <div className="flex items-center gap-3.5 mb-3">
+            <div className="w-14 h-14 rounded-2xl overflow-hidden bg-black/80 border border-white/20 p-1 shrink-0 shadow-lg">
+              <img src="/images/romee-logo.jpg" alt="ROMEE Logo" className="w-full h-full object-contain" />
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-xs font-bold text-amber-300">
+                <span className="text-base">{theme.icon}</span>
+                <span>{theme.name}</span>
+              </div>
+              <p className="text-[10px] text-white/80 italic mt-0.5 font-medium">...serving the difference</p>
+            </div>
           </div>
 
           <h2 className="font-serif text-2xl sm:text-3xl font-black text-white leading-tight">

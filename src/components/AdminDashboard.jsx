@@ -874,8 +874,8 @@ export const AdminDashboard = ({
         {/* Header Bar */}
         <div className="p-4 sm:p-5 border-b border-petrol-800 flex items-center justify-between bg-petrol-950/90 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-mustard flex items-center justify-center text-petrol-950 font-black shadow-md">
-              <ShieldCheck className="w-5 h-5" />
+            <div className="w-12 h-12 rounded-2xl bg-black border border-mustard/40 flex items-center justify-center p-1 shadow-md overflow-hidden shrink-0">
+              <img src="/images/romee-logo.jpg" alt="ROMEE Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <h2 className="font-serif text-lg sm:text-xl font-bold text-white flex items-center gap-2">
@@ -885,7 +885,7 @@ export const AdminDashboard = ({
                 </span>
               </h2>
               <p className="text-[11px] text-slate-400">
-                SQLi & XSS Shield Active • Salted SHA-256 Auth • Live Role Access & Audit
+                ...serving the difference • SQLi & XSS Shield Active • Salted SHA-256 Auth
               </p>
             </div>
           </div>
@@ -943,14 +943,14 @@ export const AdminDashboard = ({
           <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
             <div className="max-w-md w-full bg-petrol-950/90 border border-mustard/30 rounded-3xl p-8 text-center space-y-6 shadow-2xl">
               
-              <div className="w-16 h-16 rounded-full bg-mustard/20 text-mustard flex items-center justify-center mx-auto border border-mustard/40">
-                <Lock className="w-8 h-8" />
+              <div className="w-20 h-20 rounded-2xl bg-black border-2 border-mustard/50 flex items-center justify-center mx-auto shadow-xl p-1.5 overflow-hidden">
+                <img src="/images/romee-logo.jpg" alt="ROMEE Logo" className="w-full h-full object-contain" />
               </div>
 
               <div>
                 <h3 className="font-serif text-2xl font-bold text-white">Administrator Sign In</h3>
                 <p className="text-xs text-slate-400 mt-1">
-                  Superuser and Management Access Portal
+                  ROMEE Go-Bite Eatery — <span className="italic text-slate-300">...serving the difference</span>
                 </p>
                 <div className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 font-semibold mt-2 px-2.5 py-0.5 rounded-full bg-emerald-950 border border-emerald-800">
                   <ShieldCheck className="w-3 h-3" />
