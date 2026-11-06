@@ -21,7 +21,8 @@ export const ChatbotWidget = ({
   _activeMode,
   setActiveMode,
   onOpenCart,
-  whatsappNumber = '2348012345678',
+  whatsappNumber = '07068371295',
+  settings = {},
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -111,8 +112,13 @@ export const ChatbotWidget = ({
 
     // 7. Locations / Outlets / Branches
     if (q.includes('location') || q.includes('where') || q.includes('branch') || q.includes('address') || q.includes('outlet')) {
+      const dineInAddr = settings.dineInAddress || 'Plot 14B, Admiralty Way / Adeola Odeku Corridor, Victoria Island, Lagos';
+      const goBitesAddr = settings.goBitesAddress || '42 Allen Avenue (Opposite Oshopey Plaza), Ikeja, Lagos';
+      const dineInName = settings.dineInName || 'Victoria Island Flagship Hub';
+      const goBitesName = settings.goBitesName || 'Mainland Express Depot';
+      const dineInHours = settings.dineInHours || '8:00 AM – 10:30 PM';
       return {
-        text: "We operate two branches:\n\n📍 **Main Branch (Dual Outlets):** 14 Admiralty Way, Victoria Island / Lekki, Lagos.\n(Features both our Dine-In Lounge & Go Bites Express pickup counter!)\n\n📍 **Express Depot (Branch 2):** 28 Allen Avenue, Ikeja, Lagos.\n(Dedicated to fast takeaway & office delivery).\n\nOpen 7 days a week from 8:00 AM to 10:30 PM."
+        text: `We operate two major branches:\n\n📍 **${dineInName} (Dine-In Lounge & Go Bites):**\n${dineInAddr}\n(Features our air-conditioned Swallow Lounge & takeaway pickup! Hours: ${dineInHours})\n\n📍 **${goBitesName}:**\n${goBitesAddr}\n(Dedicated to fast takeaway & express courier delivery).\n\nYou can also find both on Google Maps via our Outlets page!`
       };
     }
 

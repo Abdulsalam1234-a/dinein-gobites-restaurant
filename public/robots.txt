@@ -1,0 +1,9 @@
+# ROMEE Go-Bite Eatery - Robots.txt
+# Allow search engines to crawl all public pages
+
+User-agent: *
+Allow: /
+Disallow: /admin
+
+# Sitemap link for Google Search Console and Bing Webmaster
+Sitemap: https://romeegobite.com/sitemap.xml

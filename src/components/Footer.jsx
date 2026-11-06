@@ -7,12 +7,16 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-export const Footer = ({ onOpenAdmin, whatsappNumber = '07068371295' }) => {
+export const Footer = ({ onOpenAdmin, settings = {} }) => {
   const [emailInput, setEmailInput] = useState('');
   const [subscribed, setSubscribed] = useState(false);
 
+  const whatsappNumber = settings.whatsappNumber || '07068371295';
   const cleanPhone = whatsappNumber.replace(/[^0-9]/g, '');
   const directWhatsAppUrl = `https://wa.me/${cleanPhone.startsWith('0') ? '234' + cleanPhone.slice(1) : cleanPhone}`;
+
+  const dineInTitle = settings.dineInName || 'Victoria Island / Lekki Flagship Hub';
+  const goBitesTitle = settings.goBitesName || 'Mainland Express Dispatch Depot';
 
   const handleSubscribe = (e) => {
     e.preventDefault();
@@ -129,9 +133,9 @@ export const Footer = ({ onOpenAdmin, whatsappNumber = '07068371295' }) => {
             </h4>
             <ul className="space-y-2 text-slate-400 text-xs">
               <li><Link to="/faqs" className="hover:text-white transition-colors">Frequently Asked Questions</Link></li>
-              <li><a href={directWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-400 font-bold flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> 07068371295</a></li>
-              <li className="text-slate-400">Island Hub: Victoria Island / Lekki</li>
-              <li className="text-slate-400">Mainland Depot: Allen Ave, Ikeja</li>
+              <li><a href={directWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-400 font-bold flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> {whatsappNumber}</a></li>
+              <li className="text-slate-400">{dineInTitle}</li>
+              <li className="text-slate-400">{goBitesTitle}</li>
             </ul>
           </div>
 

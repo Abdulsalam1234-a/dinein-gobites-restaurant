@@ -48,12 +48,44 @@ export const DEFAULT_USERS = [
 ];
 
 export const DEFAULT_SETTINGS = {
+  restaurantName: 'ROMEE Go-Bite Eatery',
+  tagline: 'Authentic Swallows, Plated Feasts & Express Takeaways',
   whatsappNumber: '07068371295',
+  alternatePhone: '08012345678',
+  supportEmail: 'orders@romeegobite.com',
   superuserEmail: 'salamiabdullahi247@gmail.com',
   currency: '₦',
   serviceChargeDineIn: 500,
   packagingFeeGoBites: 300,
-  restaurantName: 'ROMEE Go-Bite Eatery',
+  
+  // Dine-In Branch (Swallow Hub & Family Lounge)
+  dineInName: 'Victoria Island / Lekki Flagship Hub',
+  dineInAddress: 'Plot 14B, Admiralty Way / Adeola Odeku Corridor, Victoria Island, Lagos',
+  dineInCity: 'Victoria Island, Lagos',
+  dineInState: 'Lagos State, Nigeria',
+  dineInHours: 'Mon - Sun: 9:00 AM - 10:00 PM',
+  dineInGoogleMapsUrl: 'https://maps.google.com/?q=Victoria+Island+Lagos',
+  dineInEmbedMap: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3964.7297920199144!2d3.4243555!3d6.4287383!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x103bf53293888377%3A0xb3671ff8be28b9d3!2sVictoria%20Island%2C%20Lagos!5e0!3m2!1sen!2sng!4v1700000000000!5m2!1sen!2sng',
+
+  // Go-Bites Express Branch (Takeaway & Fast Combos)
+  goBitesName: 'Mainland Express Dispatch Depot',
+  goBitesAddress: '42 Allen Avenue (Opposite Oshopey Plaza), Ikeja, Lagos',
+  goBitesCity: 'Ikeja, Lagos',
+  goBitesState: 'Lagos State, Nigeria',
+  goBitesHours: 'Mon - Sat: 8:00 AM - 9:30 PM (Sundays: 12 PM - 8 PM)',
+  goBitesGoogleMapsUrl: 'https://maps.google.com/?q=Allen+Avenue+Ikeja+Lagos',
+  goBitesEmbedMap: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3963.3855529451994!2d3.3512214!3d6.6014498!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x103b9231f24d9c79%3A0xe96803ce58f12eb6!2sAllen%20Ave%2C%20Ikeja%2C%20Lagos!5e0!3m2!1sen!2sng!4v1700000000000!5m2!1sen!2sng',
+
+  // Seasonal Theme: 'classic' | 'christmas' | 'salah' | 'halloween' | 'valentine' | 'naija'
+  theme: 'classic',
+
+  // Welcome Announcement Modal
+  welcomePopupEnabled: true,
+  welcomeHeadline: 'Welcome to ROMEE Go-Bite Eatery! 🍲',
+  welcomeSubtitle: 'Home of authentic swallows (Amala, Semo, Pounded Yam) & rapid express favorites (Jollof, Fried Rice, Moi Moi).',
+  welcomePromoBadge: '🔥 Special Welcome Offer',
+  welcomePromoText: 'Enjoy complimentary packaging on takeaway orders above ₦10,000!',
+  welcomeButtonText: 'Explore Menu & Order Now',
 };
 
 export const INITIAL_AUDIT_LOGS = [

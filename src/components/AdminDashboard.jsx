@@ -34,7 +34,10 @@ import {
   Download,
   Copy,
   Check,
-  ShieldAlert
+  ShieldAlert,
+  MapPin,
+  Palette,
+  Megaphone
 } from 'lucide-react';
 import { 
   createSuperuserWhatsAppUrl, 
@@ -42,6 +45,7 @@ import {
   exportAllRestaurantData,
   importAllRestaurantData
 } from '../utils/storage';
+import { SEASONAL_THEMES } from '../utils/theme';
 import {
   detectSqlInjection,
   detectXss,
@@ -790,6 +794,13 @@ export const AdminDashboard = ({
       restaurantName: settingsForm.restaurantName,
       superuserEmail: settingsForm.superuserEmail,
       whatsappNumber: settingsForm.whatsappNumber,
+      dineInAddress: settingsForm.dineInAddress,
+      dineInHours: settingsForm.dineInHours,
+      goBitesAddress: settingsForm.goBitesAddress,
+      goBitesHours: settingsForm.goBitesHours,
+      welcomeHeadline: settingsForm.welcomeHeadline,
+      welcomeSubtitle: settingsForm.welcomeSubtitle,
+      welcomePromoText: settingsForm.welcomePromoText,
     });
 
     if (!validation.valid) {
@@ -799,9 +810,9 @@ export const AdminDashboard = ({
     }
 
     onUpdateSettings(settingsForm);
-    triggerAudit('UPDATE_SETTINGS', 'Updated restaurant hotline, fees, or superuser email');
+    triggerAudit('UPDATE_SETTINGS', `Updated restaurant settings: theme=${settingsForm.theme || 'classic'}, outlets & business info`);
     setSettingsSavedNotice(true);
-    showToast('Restaurant settings saved!');
+    showToast('Restaurant settings, theme & outlet info saved live!');
     setTimeout(() => setSettingsSavedNotice(false), 2500);
   };
 
@@ -1732,79 +1743,369 @@ export const AdminDashboard = ({
               {activeTab === 'settings' && (
                 <div className="max-w-3xl mx-auto space-y-6">
                   
-                  {/* General Settings */}
-                  <div className="bg-petrol-950/70 p-6 rounded-2xl border border-petrol-800 space-y-4">
-                    <h3 className="font-serif font-bold text-lg text-white">General Restaurant Configuration</h3>
+                  {/* Settings Form */}
+                  <form onSubmit={handleSaveSettings} className="space-y-6 text-xs">
 
-                    <form onSubmit={handleSaveSettings} className="space-y-4 text-xs">
-                      <div>
-                        <label className="block text-slate-300 font-semibold mb-1">Restaurant Legal Name</label>
-                        <input
-                          type="text"
-                          value={settingsForm.restaurantName}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, restaurantName: e.target.value })}
-                          className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
-                        />
+                    {/* SECTION A: SEASONAL AESTHETIC & FESTIVE THEMES */}
+                    <div className="bg-petrol-950/70 p-6 rounded-2xl border border-petrol-800 space-y-4">
+                      <div className="flex items-center gap-2 text-mustard">
+                        <Palette className="w-5 h-5" />
+                        <h3 className="font-serif font-bold text-base text-white">Seasonal Aesthetic & Festive Themes</h3>
                       </div>
+                      <p className="text-slate-300 text-xs leading-relaxed">
+                        Select a seasonal theme to instantly update the entire website's visual atmosphere, banner announcements, and celebration badges across all visitor screens.
+                      </p>
 
-                      <div>
-                        <label className="block text-slate-300 font-semibold mb-1">Superuser Alert Email</label>
-                        <input
-                          type="email"
-                          value={settingsForm.superuserEmail || 'salamiabdullahi247@gmail.com'}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, superuserEmail: e.target.value })}
-                          className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
-                        />
-                        <p className="text-[10px] text-slate-400 mt-1">Audit log reports and security threat alerts will be routed here.</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                        {Object.values(SEASONAL_THEMES).map((th) => {
+                          const isSelected = (settingsForm.theme || 'classic') === th.id;
+                          return (
+                            <div
+                              key={th.id}
+                              onClick={() => setSettingsForm({ ...settingsForm, theme: th.id })}
+                              className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between text-left select-none ${
+                                isSelected
+                                  ? 'bg-petrol-900 border-mustard shadow-md ring-2 ring-mustard/40'
+                                  : 'bg-petrol-950/90 border-petrol-800 hover:border-slate-600 hover:bg-petrol-900/60'
+                              }`}
+                            >
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xl">{th.icon}</span>
+                                  {isSelected && (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-mustard text-petrol-950">
+                                      Active Theme
+                                    </span>
+                                  )}
+                                </div>
+                                <h4 className="font-serif font-bold text-sm text-white">{th.name}</h4>
+                                <p className="text-[11px] text-slate-400 line-clamp-2">{th.tagline}</p>
+                              </div>
+
+                              <div className="pt-3 border-t border-petrol-800/80 mt-2 flex items-center justify-between text-[10px]">
+                                <span className={`px-2 py-0.5 rounded-md border ${th.accentBadge}`}>
+                                  Preview Accent
+                                </span>
+                                <span className="text-slate-400 font-mono text-[9px]">{th.accentColor}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
+                    </div>
 
-                      <div>
-                        <label className="block text-slate-300 font-semibold mb-1">WhatsApp Orders & Notifications Number</label>
-                        <input
-                          type="text"
-                          value={settingsForm.whatsappNumber}
-                          onChange={(e) => setSettingsForm({ ...settingsForm, whatsappNumber: e.target.value })}
-                          className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
-                        />
-                        <p className="text-[10px] text-slate-400 mt-1">Client cart orders compile directly to this phone number.</p>
+                    {/* SECTION B: PHYSICAL OUTLETS & GOOGLE BUSINESS MAPPING */}
+                    <div className="bg-petrol-950/70 p-6 rounded-2xl border border-petrol-800 space-y-5">
+                      <div className="flex items-center gap-2 text-mustard">
+                        <MapPin className="w-5 h-5" />
+                        <h3 className="font-serif font-bold text-base text-white">Physical Outlets & Google Business Mapping</h3>
                       </div>
+                      <p className="text-slate-300 text-xs leading-relaxed">
+                        Customize the exact physical addresses, opening hours, Google Maps direction links, and interactive embed maps for both of your restaurant branches without writing code.
+                      </p>
 
-                      <div className="grid grid-cols-2 gap-4">
+                      {/* Outlet 1: Dine-In Hub */}
+                      <div className="p-4 rounded-xl bg-petrol-900/80 border border-petrol-800 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-mustard uppercase tracking-wider flex items-center gap-1.5">
+                            <UtensilsCrossed className="w-4 h-4" />
+                            <span>Outlet 1: Dine-In Lounge (Swallows & Seating)</span>
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">Branch Display Name</label>
+                            <input
+                              type="text"
+                              value={settingsForm.dineInName || ''}
+                              onChange={(e) => setSettingsForm({ ...settingsForm, dineInName: e.target.value })}
+                              placeholder="Victoria Island / Lekki Flagship Hub"
+                              className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">Operating Hours</label>
+                            <input
+                              type="text"
+                              value={settingsForm.dineInHours || ''}
+                              onChange={(e) => setSettingsForm({ ...settingsForm, dineInHours: e.target.value })}
+                              placeholder="Monday - Sunday: 8:00 AM – 10:30 PM"
+                              className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                            />
+                          </div>
+                        </div>
+
                         <div>
-                          <label className="block text-slate-300 font-semibold mb-1">Dine-In Service Charge ({currency})</label>
+                          <label className="block text-slate-300 font-semibold mb-1">Full Physical Street Address</label>
                           <input
-                            type="number"
-                            value={settingsForm.serviceChargeDineIn}
-                            onChange={(e) => setSettingsForm({ ...settingsForm, serviceChargeDineIn: Number(e.target.value) })}
+                            type="text"
+                            value={settingsForm.dineInAddress || ''}
+                            onChange={(e) => setSettingsForm({ ...settingsForm, dineInAddress: e.target.value })}
+                            placeholder="Plot 14B, Admiralty Way / Adeola Odeku Corridor, Victoria Island, Lagos"
+                            className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">Google Maps Directions URL</label>
+                            <input
+                              type="text"
+                              value={settingsForm.dineInGoogleMapsUrl || ''}
+                              onChange={(e) => setSettingsForm({ ...settingsForm, dineInGoogleMapsUrl: e.target.value })}
+                              placeholder="https://maps.google.com/?q=Victoria+Island+Lagos"
+                              className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">Google Maps Embed Iframe URL</label>
+                            <input
+                              type="text"
+                              value={settingsForm.dineInEmbedMap || ''}
+                              onChange={(e) => setSettingsForm({ ...settingsForm, dineInEmbedMap: e.target.value })}
+                              placeholder="https://www.google.com/maps/embed?pb=..."
+                              className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Outlet 2: Go-Bites Express Hub */}
+                      <div className="p-4 rounded-xl bg-petrol-900/80 border border-petrol-800 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <Sparkles className="w-4 h-4" />
+                            <span>Outlet 2: Go-Bites Express Takeaway Depot</span>
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">Branch Display Name</label>
+                            <input
+                              type="text"
+                              value={settingsForm.goBitesName || ''}
+                              onChange={(e) => setSettingsForm({ ...settingsForm, goBitesName: e.target.value })}
+                              placeholder="Mainland Express Dispatch Depot"
+                              className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">Operating Hours</label>
+                            <input
+                              type="text"
+                              value={settingsForm.goBitesHours || ''}
+                              onChange={(e) => setSettingsForm({ ...settingsForm, goBitesHours: e.target.value })}
+                              placeholder="Mon - Sat: 7:30 AM – 9:00 PM (Sundays: 12 PM - 8 PM)"
+                              className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">Full Physical Street Address</label>
+                          <input
+                            type="text"
+                            value={settingsForm.goBitesAddress || ''}
+                            onChange={(e) => setSettingsForm({ ...settingsForm, goBitesAddress: e.target.value })}
+                            placeholder="42 Allen Avenue (Opposite Oshopey Plaza), Ikeja, Lagos"
+                            className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">Google Maps Directions URL</label>
+                            <input
+                              type="text"
+                              value={settingsForm.goBitesGoogleMapsUrl || ''}
+                              onChange={(e) => setSettingsForm({ ...settingsForm, goBitesGoogleMapsUrl: e.target.value })}
+                              placeholder="https://maps.google.com/?q=Allen+Avenue+Ikeja+Lagos"
+                              className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">Google Maps Embed Iframe URL</label>
+                            <input
+                              type="text"
+                              value={settingsForm.goBitesEmbedMap || ''}
+                              onChange={(e) => setSettingsForm({ ...settingsForm, goBitesEmbedMap: e.target.value })}
+                              placeholder="https://www.google.com/maps/embed?pb=..."
+                              className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* SECTION C: WELCOME ANNOUNCEMENT POP-UP MODAL */}
+                    <div className="bg-petrol-950/70 p-6 rounded-2xl border border-petrol-800 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-mustard">
+                          <Megaphone className="w-5 h-5" />
+                          <h3 className="font-serif font-bold text-base text-white">Visitor Welcome Pop-up Modal</h3>
+                        </div>
+
+                        <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={settingsForm.welcomePopupEnabled !== false}
+                            onChange={(e) => setSettingsForm({ ...settingsForm, welcomePopupEnabled: e.target.checked })}
+                            className="w-4 h-4 rounded text-mustard focus:ring-mustard border-petrol-700 bg-petrol-900"
+                          />
+                          <span className={settingsForm.welcomePopupEnabled !== false ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
+                            {settingsForm.welcomePopupEnabled !== false ? 'Popup Active' : 'Popup Disabled'}
+                          </span>
+                        </label>
+                      </div>
+
+                      <p className="text-slate-300 text-xs leading-relaxed">
+                        Greet visitors immediately with a personalized greeting, special seasonal promotion, or meal discount when they arrive at the website.
+                      </p>
+
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">Welcome Headline</label>
+                          <input
+                            type="text"
+                            value={settingsForm.welcomeHeadline || ''}
+                            onChange={(e) => setSettingsForm({ ...settingsForm, welcomeHeadline: e.target.value })}
+                            placeholder="Welcome to ROMEE Go-Bite Eatery! 🍲"
                             className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-slate-300 font-semibold mb-1">Go Bites Packaging Fee ({currency})</label>
+                          <label className="block text-slate-300 font-semibold mb-1">Welcome Subtitle Description</label>
                           <input
-                            type="number"
-                            value={settingsForm.packagingFeeGoBites}
-                            onChange={(e) => setSettingsForm({ ...settingsForm, packagingFeeGoBites: Number(e.target.value) })}
+                            type="text"
+                            value={settingsForm.welcomeSubtitle || ''}
+                            onChange={(e) => setSettingsForm({ ...settingsForm, welcomeSubtitle: e.target.value })}
+                            placeholder="Home of authentic swallows & rapid express takeaway favorites."
+                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">Promotion Tag Badge</label>
+                            <input
+                              type="text"
+                              value={settingsForm.welcomePromoBadge || ''}
+                              onChange={(e) => setSettingsForm({ ...settingsForm, welcomePromoBadge: e.target.value })}
+                              placeholder="🔥 Special Welcome Offer"
+                              className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">Call to Action Button Label</label>
+                            <input
+                              type="text"
+                              value={settingsForm.welcomeButtonText || ''}
+                              onChange={(e) => setSettingsForm({ ...settingsForm, welcomeButtonText: e.target.value })}
+                              placeholder="Explore Menu & Order Now"
+                              className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">Promotional Text / Discount Details</label>
+                          <textarea
+                            rows={2}
+                            value={settingsForm.welcomePromoText || ''}
+                            onChange={(e) => setSettingsForm({ ...settingsForm, welcomePromoText: e.target.value })}
+                            placeholder="Enjoy complimentary packaging on takeaway orders above ₦10,000!"
                             className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
                           />
                         </div>
                       </div>
+                    </div>
 
-                      {settingsSavedNotice && (
-                        <p className="text-emerald-400 font-bold text-center">✓ Settings saved successfully!</p>
-                      )}
+                    {/* SECTION D: GENERAL RESTAURANT DETAILS & PRICING POLICIES */}
+                    <div className="bg-petrol-950/70 p-6 rounded-2xl border border-petrol-800 space-y-4">
+                      <h3 className="font-serif font-bold text-base text-white">General Restaurant Details & Ordering Policies</h3>
 
-                      <div className="pt-2">
-                        <button
-                          type="submit"
-                          className="px-6 py-2.5 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold uppercase tracking-wider text-xs shadow-md"
-                        >
-                          Save Settings
-                        </button>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">Restaurant Legal Name</label>
+                          <input
+                            type="text"
+                            value={settingsForm.restaurantName}
+                            onChange={(e) => setSettingsForm({ ...settingsForm, restaurantName: e.target.value })}
+                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">Superuser Alert Email</label>
+                          <input
+                            type="email"
+                            value={settingsForm.superuserEmail || 'salamiabdullahi247@gmail.com'}
+                            onChange={(e) => setSettingsForm({ ...settingsForm, superuserEmail: e.target.value })}
+                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                          />
+                          <p className="text-[10px] text-slate-400 mt-1">Audit log reports and security threat alerts will be routed here.</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">WhatsApp Orders & Notifications Hotline</label>
+                          <input
+                            type="text"
+                            value={settingsForm.whatsappNumber}
+                            onChange={(e) => setSettingsForm({ ...settingsForm, whatsappNumber: e.target.value })}
+                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                          />
+                          <p className="text-[10px] text-slate-400 mt-1">Client cart orders compile directly to this phone number.</p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">Dine-In Service Charge ({currency})</label>
+                            <input
+                              type="number"
+                              value={settingsForm.serviceChargeDineIn}
+                              onChange={(e) => setSettingsForm({ ...settingsForm, serviceChargeDineIn: Number(e.target.value) })}
+                              className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-300 font-semibold mb-1">Go Bites Packaging Fee ({currency})</label>
+                            <input
+                              type="number"
+                              value={settingsForm.packagingFeeGoBites}
+                              onChange={(e) => setSettingsForm({ ...settingsForm, packagingFeeGoBites: Number(e.target.value) })}
+                              className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                            />
+                          </div>
+                        </div>
                       </div>
-                    </form>
-                  </div>
+                    </div>
+
+                    {settingsSavedNotice && (
+                      <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold text-center text-xs">
+                        ✓ All settings, seasonal theme, physical addresses, and popup configs saved successfully!
+                      </div>
+                    )}
+
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        className="w-full sm:w-auto px-8 py-3 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold uppercase tracking-wider text-xs shadow-lg transition-transform hover:scale-[1.01]"
+                      >
+                        Save All Settings & Themes
+                      </button>
+                    </div>
+
+                  </form>
 
                   {/* Production Deployment & Data Backup Tools */}
                   <div className="bg-petrol-950/70 p-6 rounded-2xl border border-mustard/30 space-y-4">
