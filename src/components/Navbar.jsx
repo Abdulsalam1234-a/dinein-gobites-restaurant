@@ -6,7 +6,8 @@ import {
   Lock, 
   MessageCircle, 
   Menu as MenuIcon, 
-  X
+  X,
+  User
 } from 'lucide-react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 
@@ -19,6 +20,9 @@ export const Navbar = ({
   setSearchQuery,
   currency = '₦',
   whatsappNumber = '07068371295',
+  currentCustomer = null,
+  onOpenCustomerAuth = () => {},
+  onOpenCustomerAccount = () => {},
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSearchInput, setShowSearchInput] = useState(false);
@@ -156,6 +160,31 @@ export const Navbar = ({
               <span>Contact us</span>
             </a>
 
+            {/* Customer Account Pill */}
+            {currentCustomer ? (
+              <button
+                onClick={onOpenCustomerAccount}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-petrol-800 hover:bg-petrol-700 border border-mustard/40 text-xs font-semibold text-white transition-all shadow-sm"
+                title="My Customer Account & Past Orders"
+              >
+                <div className="w-5 h-5 rounded-full bg-mustard text-petrol-950 flex items-center justify-center font-black text-[10px]">
+                  {currentCustomer.name ? currentCustomer.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <span className="hidden sm:inline max-w-[80px] truncate text-slate-100">
+                  {currentCustomer.name ? currentCustomer.name.split(' ')[0] : 'Account'}
+                </span>
+              </button>
+            ) : (
+              <button
+                onClick={onOpenCustomerAuth}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-petrol-800/80 hover:bg-petrol-800 border border-slate-700 hover:border-mustard text-xs font-semibold text-slate-200 hover:text-mustard transition-colors"
+                title="Sign in or create account to track orders"
+              >
+                <User className="w-3.5 h-3.5 text-mustard" />
+                <span>Sign In</span>
+              </button>
+            )}
+
             {/* Shopping Plate / Bag Button */}
             <button
               onClick={onOpenCart}
@@ -254,6 +283,34 @@ export const Navbar = ({
             >
               Help & FAQs
             </NavLink>
+
+            {/* Mobile Customer Account Button */}
+            {currentCustomer ? (
+              <button
+                onClick={() => {
+                  onOpenCustomerAccount();
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-white hover:bg-petrol-900 rounded-lg flex items-center gap-2 font-semibold border-t border-petrol-800 pt-3"
+              >
+                <div className="w-5 h-5 rounded-full bg-mustard text-petrol-950 flex items-center justify-center font-black text-[10px]">
+                  {currentCustomer.name ? currentCustomer.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <span>My Account ({currentCustomer.name})</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  onOpenCustomerAuth();
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 text-mustard hover:bg-petrol-900 rounded-lg flex items-center gap-2 font-semibold border-t border-petrol-800 pt-3"
+              >
+                <User className="w-4 h-4" />
+                <span>Sign In / Create Account (Track Orders)</span>
+              </button>
+            )}
+
             <a
               href={directWhatsAppUrl}
               target="_blank"

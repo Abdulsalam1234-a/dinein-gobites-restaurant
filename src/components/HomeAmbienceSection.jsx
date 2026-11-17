@@ -148,7 +148,7 @@ export const HomeAmbienceSection = ({ ambienceMedia = [] }) => {
           </div>
           <div>
             <h4 className="font-serif font-bold text-slate-900 text-sm">Swift Go-Bites Pickup</h4>
-            <p className="text-slate-500 text-xs mt-0.5">Zero delays: Grab your hot combo packs in under 5 minutes or have them dispatched across Lagos.</p>
+            <p className="text-slate-500 text-xs mt-0.5">Zero delays: Grab your hot combo packs in under 5 minutes or have them dispatched across Ado-Ekiti.</p>
           </div>
         </div>
       </div>

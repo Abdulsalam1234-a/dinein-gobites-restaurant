@@ -3,6 +3,7 @@ import { HeroSection } from '../components/HeroSection';
 import { BookTableBar } from '../components/BookTableBar';
 import { PopularDishesSection } from '../components/PopularDishesSection';
 import { HomeAmbienceSection } from '../components/HomeAmbienceSection';
+import { OrderingVideoSection } from '../components/OrderingVideoSection';
 import { MobileAppPromo } from '../components/MobileAppPromo';
 import { useNavigate } from 'react-router-dom';
 import { Utensils, Zap, ArrowRight, ShieldCheck, Award, HeartHandshake } from 'lucide-react';
@@ -16,6 +17,7 @@ export const HomePage = ({
   onSelectTable,
   whatsappNumber,
   ambienceMedia = [],
+  settings = {},
 }) => {
   const navigate = useNavigate();
 
@@ -34,8 +36,13 @@ export const HomePage = ({
       <HeroSection
         onExploreFood={handleExploreFood}
         onOpenWhatsAppGuide={() => {
-          const el = document.getElementById('home-mobile-promo');
-          if (el) el.scrollIntoView({ behavior: 'smooth' });
+          const el = document.getElementById('ordering-guide-video');
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth' });
+          } else {
+            const promo = document.getElementById('home-mobile-promo');
+            if (promo) promo.scrollIntoView({ behavior: 'smooth' });
+          }
         }}
       />
 
@@ -142,7 +149,10 @@ export const HomePage = ({
         </div>
       </section>
 
-      {/* 6. Mobile App Promo / WhatsApp Checkout Banner */}
+      {/* 6. Video Walkthrough: How to Use Website & Order on WhatsApp */}
+      <OrderingVideoSection settings={settings} />
+
+      {/* 7. Mobile App Promo / WhatsApp Checkout Banner */}
       <div id="home-mobile-promo">
         <MobileAppPromo 
           whatsappNumber={whatsappNumber}

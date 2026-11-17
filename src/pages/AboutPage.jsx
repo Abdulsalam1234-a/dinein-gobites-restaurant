@@ -153,7 +153,7 @@ export const AboutPage = ({ staffMembers = [] }) => {
                   </div>
                   <div>
                     <span className="block text-xl font-black text-mustard">2 Outlets</span>
-                    <span className="text-[11px] text-slate-400">Lagos Island & Mainland</span>
+                    <span className="text-[11px] text-slate-400">Adebayo Flagship & Express Depot</span>
                   </div>
                   <div>
                     <span className="block text-xl font-black text-mustard">100%</span>
@@ -244,7 +244,7 @@ export const AboutPage = ({ staffMembers = [] }) => {
               Our 4 Pillars of Excellence
             </h2>
             <p className="text-slate-300 text-xs">
-              What sets ROMEE Go-Bite Eatery apart from ordinary restaurants in Lagos.
+              What sets ROMEE Go-Bite Eatery apart from ordinary restaurants in Ado-Ekiti.
             </p>
           </div>
 

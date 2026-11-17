@@ -17,17 +17,17 @@ import {
 
 export const OutletsPage = ({ settings = {} }) => {
   const whatsappNumber = settings.whatsappNumber || '07068371295';
-  const dineInName = settings.dineInName || 'Victoria Island / Lekki Flagship Hub';
-  const dineInAddress = settings.dineInAddress || 'Plot 14B, Admiralty Way / Adeola Odeku Corridor, Victoria Island, Lagos';
-  const dineInHours = settings.dineInHours || 'Monday - Sunday: 8:00 AM – 10:30 PM (Daily Fresh Soups)';
-  const dineInMapsUrl = settings.dineInGoogleMapsUrl || 'https://maps.google.com/?q=Victoria+Island+Lagos';
-  const dineInEmbedMap = settings.dineInEmbedMap || 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3964.7297920199144!2d3.4243555!3d6.4287383!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x103bf53293888377%3A0xb3671ff8be28b9d3!2sVictoria%20Island%2C%20Lagos!5e0!3m2!1sen!2sng!4v1700000000000!5m2!1sen!2sng';
+  const dineInName = settings.dineInName || 'Adebayo Flagship Outlet (Dine-In Lounge & Go Bites)';
+  const dineInAddress = settings.dineInAddress || 'Adebayo Area, Along Iworoko Road, Ado-Ekiti, Ekiti State';
+  const dineInHours = settings.dineInHours || 'Monday - Sunday: 8:00 AM – 10:30 PM (Daily Fresh Soups & Swallows)';
+  const dineInMapsUrl = settings.dineInGoogleMapsUrl || 'https://maps.google.com/?q=Adebayo+Ado-Ekiti+Ekiti+State';
+  const dineInEmbedMap = settings.dineInEmbedMap || 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3949.7711202860824!2d5.2325!3d7.6450!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1047f015696d7499%3A0x7d67f1396a67f781!2sAdebayo%2C%20Ado%20Ekiti!5e0!3m2!1sen!2sng!4v1700000000000!5m2!1sen!2sng';
 
-  const goBitesName = settings.goBitesName || 'Mainland Express Dispatch Depot';
-  const goBitesAddress = settings.goBitesAddress || '42 Allen Avenue (Opposite Oshopey Plaza), Ikeja, Lagos';
-  const goBitesHours = settings.goBitesHours || 'Monday - Saturday: 7:30 AM – 9:00 PM (Sundays: 12 PM - 8 PM)';
-  const goBitesMapsUrl = settings.goBitesGoogleMapsUrl || 'https://maps.google.com/?q=Allen+Avenue+Ikeja+Lagos';
-  const goBitesEmbedMap = settings.goBitesEmbedMap || 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3963.3855529451994!2d3.3512214!3d6.6014498!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x103b9231f24d9c79%3A0xe96803ce58f12eb6!2sAllen%20Ave%2C%20Ikeja%2C%20Lagos!5e0!3m2!1sen!2sng!4v1700000000000!5m2!1sen!2sng';
+  const goBitesName = settings.goBitesName || 'Ado-Ekiti Express Dispatch Depot';
+  const goBitesAddress = settings.goBitesAddress || 'Opposite EKSU Junction / Adebayo Commercial Axis, Ado-Ekiti, Ekiti State';
+  const goBitesHours = settings.goBitesHours || 'Monday - Saturday: 7:30 AM – 9:30 PM (Sundays: 12 PM - 8:30 PM)';
+  const goBitesMapsUrl = settings.goBitesGoogleMapsUrl || 'https://maps.google.com/?q=EKSU+Junction+Adebayo+Ado-Ekiti';
+  const goBitesEmbedMap = settings.goBitesEmbedMap || 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3949.7711202860824!2d5.2325!3d7.6450!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1047f015696d7499%3A0x7d67f1396a67f781!2sAdebayo%2C%20Ado%20Ekiti!5e0!3m2!1sen!2sng!4v1700000000000!5m2!1sen!2sng';
 
   const [reserveOutlet, setReserveOutlet] = useState(dineInName);
   const [guestCount, setGuestCount] = useState('2 Guests');
@@ -75,7 +75,7 @@ export const OutletsPage = ({ settings = {} }) => {
           </h1>
 
           <p className="text-slate-200 text-xs sm:text-sm max-w-xl mx-auto leading-relaxed">
-            Dine in serenity at our flagship Island lounge or order swift dispatch from our high-speed Mainland Go-Bites depot.
+            Dine in serenity at our flagship Adebayo lounge or order swift dispatch from our rapid Ado-Ekiti Go-Bites depot.
           </p>
         </div>
       </section>
@@ -103,7 +103,7 @@ export const OutletsPage = ({ settings = {} }) => {
               </div>
 
               <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">
-                Our main culinary sanctuary featuring a serene, air-conditioned seated <strong>Dine-In Lounge</strong> (serving Amala with Gbegiri & Ewedu, Semo, Pounded Yam, and fresh Fish Pepper Soup), plus an adjacent <strong>Go Bites Express</strong> takeaway counter.
+                Our main culinary sanctuary in Adebayo featuring a serene, air-conditioned seated <strong>Dine-In Lounge</strong> (serving hot Amala with Gbegiri & Ewedu, Semo, Pounded Yam, and fresh Fish Pepper Soup), plus an adjacent <strong>Go Bites Express</strong> takeaway counter.
               </p>
 
               {/* Outlet Specs */}
@@ -167,12 +167,12 @@ export const OutletsPage = ({ settings = {} }) => {
                 className="w-full py-3 rounded-xl bg-petrol-900 hover:bg-petrol-800 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-transform hover:scale-[1.01]"
               >
                 <MessageCircle className="w-4 h-4 text-mustard" />
-                <span>Chat with Island Host on WhatsApp</span>
+                <span>Chat with Adebayo Host on WhatsApp</span>
               </a>
             </div>
           </div>
 
-          {/* Branch 2: Ikeja Allen (Go Bites Express Takeaway Only) */}
+          {/* Branch 2: Ado-Ekiti Express Dispatch Depot (Go Bites Express Takeaway Only) */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-card-elevated space-y-6 flex flex-col justify-between">
             <div className="space-y-4">
               
@@ -191,7 +191,7 @@ export const OutletsPage = ({ settings = {} }) => {
               </div>
 
               <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">
-                Dedicated high-speed <strong>Go Bites Express</strong> facility engineered for rapid 3-minute takeaway pickups and doorstep delivery across Ikeja, Maryland, and the Mainland. <em>(Specializes in Party Jollof, Fried Rice, Ofada, and Combos)</em>.
+                Dedicated high-speed <strong>Go Bites Express</strong> facility engineered for rapid 3-minute takeaway pickups and doorstep delivery across Adebayo, EKSU Axis, Fajuyi, and across Ado-Ekiti. <em>(Specializes in Party Jollof, Fried Rice, Ofada, and Combos)</em>.
               </p>
 
               {/* Outlet Specs */}

@@ -44,7 +44,7 @@ export const MobileAppPromo = ({ whatsappNumber = '07068371295' }) => {
               <img className="w-8 h-8 rounded-full border-2 border-white object-cover" src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=100&q=80" alt="Diner" />
             </div>
             <span className="text-xs font-bold text-petrol-950">
-              5,000+ Happy Foodies in Lagos
+              5,000+ Happy Foodies in Ado-Ekiti & Beyond
             </span>
           </div>
 

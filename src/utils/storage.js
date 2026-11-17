@@ -1,6 +1,7 @@
 import { INITIAL_MENU_ITEMS } from '../data/initialMenu';
 import { INITIAL_STAFF_MEMBERS } from '../data/initialStaff';
 import { INITIAL_AMBIENCE_MEDIA } from '../data/initialAmbience';
+import { hashPassword, verifyPassword } from './security';
 
 const STORAGE_KEYS = {
   MENU: 'romee_gobite_menu_items_v2',
@@ -9,39 +10,26 @@ const STORAGE_KEYS = {
   AMBIENCE: 'romee_gobite_ambience_v2',
   USERS: 'romee_gobite_users_v2',
   AUDIT_LOGS: 'romee_gobite_audit_logs_v2',
+  PASSWORD_RESETS: 'romee_gobite_password_resets_v2',
+  CUSTOMERS: 'romee_gobite_customers_v2',
+  CURRENT_CUSTOMER: 'romee_gobite_current_customer_v2',
+  CUSTOMER_ORDERS: 'romee_gobite_customer_orders_v2',
+  CUSTOMER_OTPS: 'romee_gobite_customer_otps_v2',
 };
+
+// Pre-computed salted SHA-256 digest (zero plaintext passwords stored in source code)
+const SUPERUSER_AUTH_DIGEST =
+  '96f129bd7b654abdd2391713b85089c3:eb180ce413f0d2428514ddf5dbc682153a7a3772289d09568cca5f026c121ded';
 
 export const DEFAULT_USERS = [
   {
     id: 'user-superuser',
     email: 'salamiabdullahi247@gmail.com',
-    password: '1234',
+    password: SUPERUSER_AUTH_DIGEST,
     name: 'Abdullahi Salami',
     role: 'superuser',
     title: 'Super Administrator & Owner',
     permissions: ['all'],
-    status: 'active',
-    createdAt: '2026-10-28',
-  },
-  {
-    id: 'user-manager-1',
-    email: 'manager@romeegobite.com',
-    password: '1234',
-    name: 'Folashade Balogun',
-    role: 'manager',
-    title: 'General Manager (Operations)',
-    permissions: ['menu', 'pricing', 'staff', 'ambience'],
-    status: 'active',
-    createdAt: '2026-10-28',
-  },
-  {
-    id: 'user-chef-1',
-    email: 'kitchen@romeegobite.com',
-    password: '1234',
-    name: 'Chef Sunday Alabi',
-    role: 'kitchen',
-    title: 'Executive Head Chef',
-    permissions: ['menu', 'ambience'],
     status: 'active',
     createdAt: '2026-10-28',
   },
@@ -52,37 +40,40 @@ export const DEFAULT_SETTINGS = {
   tagline: 'Authentic Swallows, Plated Feasts & Express Takeaways',
   whatsappNumber: '07068371295',
   alternatePhone: '08012345678',
-  supportEmail: 'orders@romeegobite.com',
+  supportEmail: 'orders@romeeeatery.com.ng',
   superuserEmail: 'salamiabdullahi247@gmail.com',
   currency: '₦',
   serviceChargeDineIn: 500,
   packagingFeeGoBites: 300,
   
-  // Dine-In Branch (Swallow Hub & Family Lounge)
-  dineInName: 'Victoria Island / Lekki Flagship Hub',
-  dineInAddress: 'Plot 14B, Admiralty Way / Adeola Odeku Corridor, Victoria Island, Lagos',
-  dineInCity: 'Victoria Island, Lagos',
-  dineInState: 'Lagos State, Nigeria',
-  dineInHours: 'Mon - Sun: 9:00 AM - 10:00 PM',
-  dineInGoogleMapsUrl: 'https://maps.google.com/?q=Victoria+Island+Lagos',
-  dineInEmbedMap: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3964.7297920199144!2d3.4243555!3d6.4287383!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x103bf53293888377%3A0xb3671ff8be28b9d3!2sVictoria%20Island%2C%20Lagos!5e0!3m2!1sen!2sng!4v1700000000000!5m2!1sen!2sng',
+  // Dine-In Branch (Swallow Hub & Family Lounge) - Adebayo, Ado-Ekiti
+  dineInName: 'Adebayo Flagship Outlet (Dine-In Swallow Lounge & Go-Bites Express)',
+  dineInAddress: 'Adebayo Area, Along Iworoko Road, Ado-Ekiti, Ekiti State, Nigeria',
+  dineInCity: 'Ado-Ekiti',
+  dineInState: 'Ekiti State, Nigeria',
+  dineInHours: 'Mon - Sun: 8:00 AM - 10:30 PM (Daily Fresh Soups & Swallows)',
+  dineInGoogleMapsUrl: 'https://maps.google.com/?q=Adebayo+Ado+Ekiti+Nigeria',
+  dineInEmbedMap: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3950.457193297597!2d5.228000!3d7.645000!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1047fa8c3534b071%3A0x6b4ef8fa90757754!2sAdebayo%2C%20Ado%20Ekiti!5e0!3m2!1sen!2sng!4v1700000000000!5m2!1sen!2sng',
 
-  // Go-Bites Express Branch (Takeaway & Fast Combos)
-  goBitesName: 'Mainland Express Dispatch Depot',
-  goBitesAddress: '42 Allen Avenue (Opposite Oshopey Plaza), Ikeja, Lagos',
-  goBitesCity: 'Ikeja, Lagos',
-  goBitesState: 'Lagos State, Nigeria',
-  goBitesHours: 'Mon - Sat: 8:00 AM - 9:30 PM (Sundays: 12 PM - 8 PM)',
-  goBitesGoogleMapsUrl: 'https://maps.google.com/?q=Allen+Avenue+Ikeja+Lagos',
-  goBitesEmbedMap: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3963.3855529451994!2d3.3512214!3d6.6014498!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x103b9231f24d9c79%3A0xe96803ce58f12eb6!2sAllen%20Ave%2C%20Ikeja%2C%20Lagos!5e0!3m2!1sen!2sng!4v1700000000000!5m2!1sen!2sng',
+  // Go-Bites Express Branch (Takeaway & Fast Combos) - Ado-Ekiti
+  goBitesName: 'Ado-Ekiti Express Dispatch Depot',
+  goBitesAddress: 'Opposite EKSU Junction / Adebayo Commercial Axis, Ado-Ekiti, Ekiti State',
+  goBitesCity: 'Ado-Ekiti',
+  goBitesState: 'Ekiti State, Nigeria',
+  goBitesHours: 'Mon - Sat: 7:30 AM - 9:30 PM (Sundays: 12 PM - 8 PM)',
+  goBitesGoogleMapsUrl: 'https://maps.google.com/?q=Adebayo+Ado+Ekiti+Nigeria',
+  goBitesEmbedMap: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3950.457193297597!2d5.228000!3d7.645000!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x1047fa8c3534b071%3A0x6b4ef8fa90757754!2sAdebayo%2C%20Ado%20Ekiti!5e0!3m2!1sen!2sng!4v1700000000000!5m2!1sen!2sng',
+
+  // Video Tutorial URL for ordering
+  tutorialVideoUrl: '',
 
   // Seasonal Theme: 'classic' | 'christmas' | 'salah' | 'halloween' | 'valentine' | 'naija'
   theme: 'classic',
 
   // Welcome Announcement Modal
   welcomePopupEnabled: true,
-  welcomeHeadline: 'Welcome to ROMEE Go-Bite Eatery! 🍲',
-  welcomeSubtitle: 'Home of authentic swallows (Amala, Semo, Pounded Yam) & rapid express favorites (Jollof, Fried Rice, Moi Moi).',
+  welcomeHeadline: 'Welcome to ROMEE Go-Bite Eatery, Adebayo! 🍲',
+  welcomeSubtitle: 'Home of authentic swallows (Amala, Semo, Pounded Yam) & rapid express favorites (Jollof, Fried Rice, Moi Moi) in Ado-Ekiti.',
   welcomePromoBadge: '🔥 Special Welcome Offer',
   welcomePromoText: 'Enjoy complimentary packaging on takeaway orders above ₦10,000!',
   welcomeButtonText: 'Explore Menu & Order Now',
@@ -209,7 +200,16 @@ export const loadUsersFromStorage = () => {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // Ensure legacy unhashed superuser account is upgraded to salted SHA-256 digest
+        const updated = parsed.map((u) => {
+          if (u.email && u.email.toLowerCase() === 'salamiabdullahi247@gmail.com') {
+            if (!u.password || !u.password.includes(':')) {
+              return { ...u, password: SUPERUSER_AUTH_DIGEST };
+            }
+          }
+          return u;
+        });
+        return updated;
       }
     }
   } catch (e) {
@@ -224,6 +224,78 @@ export const saveUsersToStorage = (users) => {
   } catch (e) {
     console.error('Failed to save users to storage:', e);
   }
+};
+
+// 5B. Password Reset Requests Storage
+export const loadPasswordResetsFromStorage = () => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.PASSWORD_RESETS);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load password resets:', e);
+  }
+  return [];
+};
+
+export const savePasswordResetsToStorage = (resets) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.PASSWORD_RESETS, JSON.stringify(resets));
+  } catch (e) {
+    console.error('Failed to save password resets:', e);
+  }
+};
+
+export const createPasswordResetRequest = (email) => {
+  const users = loadUsersFromStorage();
+  const cleanEmail = email.trim().toLowerCase();
+  const user = users.find((u) => u.email.toLowerCase() === cleanEmail);
+
+  if (!user) {
+    return { success: false, error: 'No account registered with this email address.' };
+  }
+
+  // Generate 6-digit random verification code
+  const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const currentResets = loadPasswordResetsFromStorage();
+
+  const newTicket = {
+    id: `reset-${Date.now()}`,
+    email: cleanEmail,
+    userName: user.name,
+    userRole: user.role,
+    code: resetCode,
+    status: 'pending',
+    requestedAt: new Date().toLocaleString('en-NG'),
+  };
+
+  const updatedResets = [newTicket, ...currentResets.filter((r) => r.email !== cleanEmail)];
+  savePasswordResetsToStorage(updatedResets);
+
+  return { success: true, ticket: newTicket, user };
+};
+
+export const createPasswordResetWhatsAppUrl = (ticket, whatsappNumber = '07068371295') => {
+  const cleanPhone = whatsappNumber.replace(/[^0-9]/g, '');
+  const baseWa = cleanPhone.startsWith('0') ? '234' + cleanPhone.slice(1) : cleanPhone;
+
+  const text = [
+    `🔑 *ROMEE EATERY - PASSWORD RESET REQUEST*`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `👤 *Staff*: ${ticket.userName}`,
+    `📧 *Email*: ${ticket.email}`,
+    `🏷️ *Role*: ${ticket.userRole?.toUpperCase()}`,
+    `🔢 *Reset Code*: #${ticket.code}`,
+    `⏰ *Requested*: ${ticket.requestedAt}`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `Super Admin, please reset my management password or approve my access code.`,
+  ].join('\n');
+
+  return `https://wa.me/${baseWa}?text=${encodeURIComponent(text)}`;
 };
 
 // 6. Audit & History Logs Storage
@@ -386,3 +458,186 @@ export const resetStorageToDefaults = () => {
     auditLogs: INITIAL_AUDIT_LOGS,
   };
 };
+
+// 10. Public Customer Accounts & Order History
+export const loadCustomersFromStorage = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.CUSTOMERS);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const saveCustomersToStorage = (customers) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(customers));
+  } catch (err) {
+    console.error('Failed to save customers to storage:', err);
+  }
+};
+
+export const loadCurrentCustomer = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.CURRENT_CUSTOMER);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const saveCurrentCustomer = (customer) => {
+  try {
+    if (customer) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_CUSTOMER, JSON.stringify(customer));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_CUSTOMER);
+    }
+  } catch (err) {
+    console.error('Failed to save current customer:', err);
+  }
+};
+
+export const loadCustomerOrdersFromStorage = (customerUid = null) => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.CUSTOMER_ORDERS);
+    const all = raw ? JSON.parse(raw) : [];
+    if (!customerUid) return all;
+    return all.filter((o) => o.customer?.uid === customerUid || o.customerUid === customerUid);
+  } catch {
+    return [];
+  }
+};
+
+export const saveCustomerOrderToStorage = (order) => {
+  try {
+    const existing = loadCustomerOrdersFromStorage();
+    const updated = [order, ...existing.filter((o) => o.id !== order.id)];
+    localStorage.setItem(STORAGE_KEYS.CUSTOMER_ORDERS, JSON.stringify(updated));
+    return updated;
+  } catch (err) {
+    console.error('Failed to save customer order:', err);
+    return [];
+  }
+};
+
+// OTP Verification Helpers for Email/Password Sign-up
+export const generateCustomerOtp = (email, customerPendingData = {}) => {
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const ticket = {
+    email: email.trim().toLowerCase(),
+    code,
+    pendingData: customerPendingData,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 mins
+  };
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.CUSTOMER_OTPS);
+    const existing = raw ? JSON.parse(raw) : [];
+    const filtered = existing.filter((t) => t.email !== ticket.email);
+    localStorage.setItem(STORAGE_KEYS.CUSTOMER_OTPS, JSON.stringify([...filtered, ticket]));
+  } catch (e) {
+    console.error('Failed to save OTP ticket:', e);
+  }
+
+  return ticket;
+};
+
+export const verifyCustomerOtp = (email, code) => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.CUSTOMER_OTPS);
+    const existing = raw ? JSON.parse(raw) : [];
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanCode = code.trim();
+
+    const found = existing.find((t) => t.email === cleanEmail && t.code === cleanCode);
+    if (!found) {
+      return { success: false, error: 'Invalid 6-digit OTP code. Please check and try again.' };
+    }
+
+    if (new Date(found.expiresAt) < new Date()) {
+      return { success: false, error: 'This verification code has expired. Please request a new one.' };
+    }
+
+    // Clean up ticket
+    const remaining = existing.filter((t) => t.email !== cleanEmail);
+    localStorage.setItem(STORAGE_KEYS.CUSTOMER_OTPS, JSON.stringify(remaining));
+
+    return { success: true, pendingData: found.pendingData };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+};
+
+export const findCustomerByEmail = (email) => {
+  const customers = loadCustomersFromStorage();
+  const cleanEmail = (email || '').trim().toLowerCase();
+  return customers.find((c) => c.email.toLowerCase() === cleanEmail) || null;
+};
+
+export const registerCustomer = async (data) => {
+  const customers = loadCustomersFromStorage();
+  const cleanEmail = data.email.trim().toLowerCase();
+
+  if (customers.some((c) => c.email.toLowerCase() === cleanEmail)) {
+    return { success: false, error: 'An account with this email already exists. Please sign in.' };
+  }
+
+  const newCustomer = {
+    uid: 'cust_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8),
+    name: data.name.trim(),
+    email: cleanEmail,
+    passwordHash: data.password ? await hashPassword(data.password) : null,
+    phone: (data.phone || '').trim(),
+    address: (data.address || '').trim(),
+    provider: data.provider || 'password', // 'password' | 'google'
+    avatar: data.avatar || null,
+    createdAt: new Date().toISOString(),
+    isVerified: true,
+  };
+
+  const updated = [newCustomer, ...customers];
+  saveCustomersToStorage(updated);
+  saveCurrentCustomer(newCustomer);
+  return { success: true, customer: newCustomer };
+};
+
+export const authenticateCustomer = async (email, password) => {
+  const customer = findCustomerByEmail(email);
+  if (!customer) {
+    return { success: false, error: 'No account found with this email address.' };
+  }
+
+  if (customer.provider === 'google' && !customer.passwordHash) {
+    return { success: false, error: 'This account is linked with Google. Please use Continue with Google.' };
+  }
+
+  const isValid = await verifyPassword(password, customer.passwordHash);
+  if (!isValid) {
+    return { success: false, error: 'Incorrect password. Please try again or reset it.' };
+  }
+
+  saveCurrentCustomer(customer);
+  return { success: true, customer };
+};
+
+export const updateCustomerProfile = (customerUid, updates) => {
+  const customers = loadCustomersFromStorage();
+  const updatedCustomers = customers.map((c) => {
+    if (c.uid === customerUid) {
+      return { ...c, ...updates, updatedAt: new Date().toISOString() };
+    }
+    return c;
+  });
+
+  saveCustomersToStorage(updatedCustomers);
+  const current = loadCurrentCustomer();
+  if (current && current.uid === customerUid) {
+    const updatedCurrent = { ...current, ...updates, updatedAt: new Date().toISOString() };
+    saveCurrentCustomer(updatedCurrent);
+    return updatedCurrent;
+  }
+  return null;
+};
+

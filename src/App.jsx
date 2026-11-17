@@ -11,6 +11,8 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { ChatbotWidget } from './components/ChatbotWidget';
 import { WelcomeModal } from './components/WelcomeModal';
 import { ThemeAmbientEffects } from './components/ThemeAmbientEffects';
+import { CustomerAuthModal } from './components/CustomerAuthModal';
+import { CustomerAccountDrawer } from './components/CustomerAccountDrawer';
 import { getActiveTheme } from './utils/theme';
 
 // Pages
@@ -36,8 +38,17 @@ import {
   loadAuditLogsFromStorage,
   saveAuditLogsToStorage,
   addAuditLog,
-  resetStorageToDefaults 
+  resetStorageToDefaults,
+  loadCurrentCustomer,
+  saveCustomerOrderToStorage
 } from './utils/storage';
+import { 
+  isFirebaseConfigured, 
+  saveToCloudFirestore, 
+  subscribeToCloudSection, 
+  pullAllDataFromCloud,
+  saveCustomerOrderToCloud
+} from './utils/firebase';
 import { compileWhatsAppOrder } from './utils/whatsapp';
 
 export default function App() {
@@ -74,10 +85,95 @@ export default function App() {
     }
   }, [cart]);
 
+  // Global Real-time Cloud Database Synchronization
+  useEffect(() => {
+    if (!isFirebaseConfigured()) return;
+
+    // 1. Initial Pull from Cloud
+    pullAllDataFromCloud().then((cloudData) => {
+      if (!cloudData) return;
+      if (Array.isArray(cloudData.menu) && cloudData.menu.length > 0) {
+        setMenuItems(cloudData.menu);
+        saveMenuToStorage(cloudData.menu);
+      }
+      if (cloudData.settings && typeof cloudData.settings === 'object') {
+        setSettings((prev) => {
+          const merged = { ...prev, ...cloudData.settings };
+          saveSettingsToStorage(merged);
+          return merged;
+        });
+      }
+      if (Array.isArray(cloudData.staff) && cloudData.staff.length > 0) {
+        setStaffMembers(cloudData.staff);
+        saveStaffToStorage(cloudData.staff);
+      }
+      if (Array.isArray(cloudData.ambience) && cloudData.ambience.length > 0) {
+        setAmbienceMedia(cloudData.ambience);
+        saveAmbienceToStorage(cloudData.ambience);
+      }
+      if (Array.isArray(cloudData.users) && cloudData.users.length > 0) {
+        setUsers(cloudData.users);
+        saveUsersToStorage(cloudData.users);
+      }
+    });
+
+    // 2. Real-time Live Subscriptions (changes on mobile immediately reflect on laptop)
+    const unsubMenu = subscribeToCloudSection('menu', (cloudMenu) => {
+      if (Array.isArray(cloudMenu) && cloudMenu.length > 0) {
+        setMenuItems(cloudMenu);
+        saveMenuToStorage(cloudMenu);
+      }
+    });
+
+    const unsubSettings = subscribeToCloudSection('settings', (cloudSettings) => {
+      if (cloudSettings && typeof cloudSettings === 'object') {
+        setSettings((prev) => {
+          const merged = { ...prev, ...cloudSettings };
+          saveSettingsToStorage(merged);
+          return merged;
+        });
+      }
+    });
+
+    const unsubStaff = subscribeToCloudSection('staff', (cloudStaff) => {
+      if (Array.isArray(cloudStaff) && cloudStaff.length > 0) {
+        setStaffMembers(cloudStaff);
+        saveStaffToStorage(cloudStaff);
+      }
+    });
+
+    const unsubAmbience = subscribeToCloudSection('ambience', (cloudAmbience) => {
+      if (Array.isArray(cloudAmbience) && cloudAmbience.length > 0) {
+        setAmbienceMedia(cloudAmbience);
+        saveAmbienceToStorage(cloudAmbience);
+      }
+    });
+
+    const unsubUsers = subscribeToCloudSection('users', (cloudUsers) => {
+      if (Array.isArray(cloudUsers) && cloudUsers.length > 0) {
+        setUsers(cloudUsers);
+        saveUsersToStorage(cloudUsers);
+      }
+    });
+
+    return () => {
+      unsubMenu();
+      unsubSettings();
+      unsubStaff();
+      unsubAmbience();
+      unsubUsers();
+    };
+  }, []);
+
   // 4. Modals State
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [orderModalData, setOrderModalData] = useState(null);
+
+  // 4B. Customer Account & Authentication State
+  const [currentCustomer, setCurrentCustomer] = useState(loadCurrentCustomer);
+  const [isCustomerAuthOpen, setIsCustomerAuthOpen] = useState(false);
+  const [isCustomerAccountOpen, setIsCustomerAccountOpen] = useState(false);
 
   // 5. Global Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -115,12 +211,21 @@ export default function App() {
     setCart([]);
   };
 
+  // 1-Click Re-Order from Customer Account History
+  const handleReOrder = (itemsToReOrder) => {
+    if (!Array.isArray(itemsToReOrder)) return;
+    itemsToReOrder.forEach((item) => {
+      handleAddToCart(item);
+    });
+    setIsCartOpen(true);
+  };
+
   // Cart Metrics
   const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
   const cartTotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
-  // 7. WhatsApp Checkout Action
-  const handleProceedToWhatsApp = ({ cart, mode, customerInfo, totals }) => {
+  // 7. WhatsApp Checkout Action (with automatic customer order logging & cloud sync)
+  const handleProceedToWhatsApp = ({ cart, mode, customerInfo, customer, totals }) => {
     const compiled = compileWhatsAppOrder({
       cart,
       mode,
@@ -130,6 +235,37 @@ export default function App() {
       currency: settings.currency,
     });
 
+    const activeUser = customer || currentCustomer;
+    const orderRecord = {
+      id: compiled.orderNumber || ('#ROM-' + Math.floor(10000 + Math.random() * 90000)),
+      customerUid: activeUser ? activeUser.uid : 'guest',
+      customer: activeUser ? {
+        uid: activeUser.uid,
+        name: activeUser.name,
+        email: activeUser.email,
+        phone: activeUser.phone,
+      } : {
+        uid: 'guest',
+        name: customerInfo.name || 'Guest Customer',
+        phone: customerInfo.phone || '',
+        location: customerInfo.location || customerInfo.tableNumber || '',
+      },
+      mode,
+      cart,
+      customerInfo,
+      totals,
+      createdAt: new Date().toISOString(),
+      status: 'whatsapp_confirmed',
+    };
+
+    // Save order to customer's order history in local storage
+    saveCustomerOrderToStorage(orderRecord);
+
+    // If Cloud Database is connected, automatically sync order to Cloud Firestore
+    if (isFirebaseConfigured()) {
+      saveCustomerOrderToCloud(orderRecord);
+    }
+
     setOrderModalData({
       ...compiled,
       mode,
@@ -137,30 +273,45 @@ export default function App() {
     setIsCartOpen(false);
   };
 
-  // 8. Admin Updates
+  // 8. Admin Updates (Local Storage + Global Cloud Database Sync)
   const handleUpdateMenuItems = (newItems) => {
     setMenuItems(newItems);
     saveMenuToStorage(newItems);
+    if (isFirebaseConfigured()) {
+      saveToCloudFirestore('menu', newItems);
+    }
   };
 
   const handleUpdateSettings = (newSettings) => {
     setSettings(newSettings);
     saveSettingsToStorage(newSettings);
+    if (isFirebaseConfigured()) {
+      saveToCloudFirestore('settings', newSettings);
+    }
   };
 
   const handleUpdateStaff = (newStaff) => {
     setStaffMembers(newStaff);
     saveStaffToStorage(newStaff);
+    if (isFirebaseConfigured()) {
+      saveToCloudFirestore('staff', newStaff);
+    }
   };
 
   const handleUpdateAmbience = (newAmbience) => {
     setAmbienceMedia(newAmbience);
     saveAmbienceToStorage(newAmbience);
+    if (isFirebaseConfigured()) {
+      saveToCloudFirestore('ambience', newAmbience);
+    }
   };
 
   const handleUpdateUsers = (newUsers) => {
     setUsers(newUsers);
     saveUsersToStorage(newUsers);
+    if (isFirebaseConfigured()) {
+      saveToCloudFirestore('users', newUsers);
+    }
   };
 
   const handleAddAuditLog = (action, details, user) => {
@@ -237,6 +388,9 @@ export default function App() {
           setSearchQuery={setSearchQuery}
           currency={settings.currency}
           whatsappNumber={settings.whatsappNumber}
+          currentCustomer={currentCustomer}
+          onOpenCustomerAuth={() => setIsCustomerAuthOpen(true)}
+          onOpenCustomerAccount={() => setIsCustomerAccountOpen(true)}
         />
 
         {/* Dynamic Multi-Page Routes */}
@@ -254,6 +408,7 @@ export default function App() {
                   onSelectTable={(table) => setPrefilledTable(table)}
                   whatsappNumber={settings.whatsappNumber}
                   ambienceMedia={ambienceMedia}
+                  settings={settings}
                 />
               } 
             />
@@ -341,6 +496,32 @@ export default function App() {
           serviceChargeDineIn={settings.serviceChargeDineIn}
           packagingFeeGoBites={settings.packagingFeeGoBites}
           prefilledTable={prefilledTable}
+          currentCustomer={currentCustomer}
+          onOpenCustomerAuth={() => setIsCustomerAuthOpen(true)}
+        />
+
+        {/* Public Customer Authentication Modal (Google 1-Click + Email & 6-Digit OTP) */}
+        <CustomerAuthModal
+          isOpen={isCustomerAuthOpen}
+          onClose={() => setIsCustomerAuthOpen(false)}
+          onSuccess={(cust) => {
+            setCurrentCustomer(cust);
+            setIsCustomerAuthOpen(false);
+          }}
+          whatsappNumber={settings.whatsappNumber}
+        />
+
+        {/* Customer Account & Order History Drawer */}
+        <CustomerAccountDrawer
+          isOpen={isCustomerAccountOpen}
+          onClose={() => setIsCustomerAccountOpen(false)}
+          customer={currentCustomer}
+          onLogout={() => setCurrentCustomer(null)}
+          onReOrder={handleReOrder}
+          currency={settings.currency}
+          onNavigateMenu={() => {
+            window.location.href = '/menu';
+          }}
         />
 
         {/* WhatsApp Order Confirmation Modal */}

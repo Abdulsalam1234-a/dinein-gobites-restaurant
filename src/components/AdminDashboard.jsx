@@ -37,20 +37,39 @@ import {
   ShieldAlert,
   MapPin,
   Palette,
-  Megaphone
+  Megaphone,
+  Database,
+  Cloud,
+  Globe,
+  Share2,
+  ArrowDownToLine,
+  ArrowUpFromLine
 } from 'lucide-react';
 import { 
   createSuperuserWhatsAppUrl, 
   createSuperuserMailtoUrl,
   exportAllRestaurantData,
-  importAllRestaurantData
+  importAllRestaurantData,
+  createPasswordResetRequest,
+  loadPasswordResetsFromStorage,
+  savePasswordResetsToStorage,
+  createPasswordResetWhatsAppUrl
 } from '../utils/storage';
+import {
+  isFirebaseConfigured,
+  getFirebaseConfig,
+  saveFirebaseConfig,
+  clearFirebaseConfig,
+  pushAllDataToCloud,
+  pullAllDataFromCloud
+} from '../utils/firebase';
 import { SEASONAL_THEMES } from '../utils/theme';
 import {
   detectSqlInjection,
   detectXss,
   sanitizeInput,
   validateAndSanitizeFormData,
+  generateSalt,
   hashPassword,
   verifyPassword,
   checkRateLimit,
@@ -79,9 +98,49 @@ export const AdminDashboard = ({
   onAddAuditLog,
   onClearAuditLogs,
 }) => {
-  // Login credentials state
-  const [emailInput, setEmailInput] = useState('salamiabdullahi247@gmail.com');
-  const [passwordInput, setPasswordInput] = useState('1234');
+  // Standard Multi-Mode Authentication State ('login' | 'register' | 'forgot')
+  const [authMode, setAuthMode] = useState('login');
+  const [emailInput, setEmailInput] = useState(() => {
+    try {
+      return localStorage.getItem('romee_remembered_admin_email') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberEmail, setRememberEmail] = useState(() => {
+    try {
+      return Boolean(localStorage.getItem('romee_remembered_admin_email'));
+    } catch {
+      return false;
+    }
+  });
+
+  // Self-Registration for Management & Staff
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regRole, setRegRole] = useState('manager'); // 'manager' | 'chef' | 'cashier'
+  const [regOutlet, setRegOutlet] = useState('Adebayo Flagship Outlet (Dine-In Lounge)');
+  const [regError, setRegError] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+
+  // Forgot Password / Reset Flow
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotStep, setForgotStep] = useState('request'); // 'request' | 'verify'
+  const [forgotCode, setForgotCode] = useState('');
+  const [forgotNewPass, setForgotNewPass] = useState('');
+  const [forgotTicket, setForgotTicket] = useState(null);
+  const [forgotError, setForgotError] = useState('');
+  const [forgotSuccess, setForgotSuccess] = useState('');
+  const [isResettingPass, setIsResettingPass] = useState(false);
+
+  // Superuser Direct Password Reset for User Accounts
+  const [targetUserForReset, setTargetUserForReset] = useState(null);
+  const [adminNewUserPassword, setAdminNewUserPassword] = useState('');
+  const [passwordResetsList, setPasswordResetsList] = useState(loadPasswordResetsFromStorage);
+
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = sessionStorage.getItem('romee_current_admin_user');
@@ -156,6 +215,21 @@ export const AdminDashboard = ({
   // 6. Settings State
   const [settingsForm, setSettingsForm] = useState(settings);
   const [settingsSavedNotice, setSettingsSavedNotice] = useState(false);
+
+  // 7. Global Cloud Database Sync State
+  const [firebaseConfigForm, setFirebaseConfigForm] = useState(() => {
+    return getFirebaseConfig() || {
+      apiKey: '',
+      authDomain: '',
+      projectId: '',
+      storageBucket: '',
+      messagingSenderId: '',
+      appId: '',
+    };
+  });
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [cloudStatusNotice, setCloudStatusNotice] = useState('');
+  const isCloudReady = isFirebaseConfigured();
 
   useEffect(() => {
     setSettingsForm(settings);
@@ -257,7 +331,14 @@ export const AdminDashboard = ({
         found.password = upgradedHash;
       }
 
-      // 6. Create secure session token
+      // 6. Remember email preference if checked
+      if (rememberEmail) {
+        localStorage.setItem('romee_remembered_admin_email', cleanEmail);
+      } else {
+        localStorage.removeItem('romee_remembered_admin_email');
+      }
+
+      // 7. Create secure session token
       const session = createSecureSession(found);
       setCurrentUser(session.user);
       triggerAudit('LOGIN_SUCCESSFUL', `${found.name} signed into Admin Portal as ${found.role.toUpperCase()}`);
@@ -273,9 +354,298 @@ export const AdminDashboard = ({
   const handleLogout = () => {
     setCurrentUser(null);
     sessionStorage.removeItem('romee_current_admin_user');
-    setEmailInput('salamiabdullahi247@gmail.com');
-    setPasswordInput('1234');
+    setPasswordInput('');
+    if (!rememberEmail) {
+      setEmailInput('');
+    }
+    setAuthMode('login');
     showToast('You have been logged out securely.');
+  };
+
+  // ================= 1B. SELF-REGISTRATION FOR MANAGEMENT =================
+  const handleRegisterSubmit = async (e) => {
+    e.preventDefault();
+    setRegError('');
+    setIsRegistering(true);
+
+    const cleanName = sanitizeInput(regName.trim());
+    const cleanEmail = regEmail.trim().toLowerCase();
+    const cleanPassword = regPassword.trim();
+
+    if (!cleanName || cleanName.length < 2) {
+      setRegError('Please enter your full legal name.');
+      setIsRegistering(false);
+      return;
+    }
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setRegError('Please provide a valid official email address.');
+      setIsRegistering(false);
+      return;
+    }
+
+    if (cleanPassword.length < 6) {
+      setRegError('Password must be at least 6 characters long.');
+      setIsRegistering(false);
+      return;
+    }
+
+    // Check injection
+    const sqli = detectSqlInjection(cleanName) || detectSqlInjection(cleanEmail) || detectSqlInjection(cleanPassword);
+    if (sqli.isSuspicious) {
+      setRegError('Malicious input pattern detected.');
+      setIsRegistering(false);
+      return;
+    }
+
+    // Check if email already registered
+    const exists = users.some((u) => u.email.toLowerCase() === cleanEmail);
+    if (exists) {
+      setRegError('An account with this email address already exists. Please sign in or use Forgot Password.');
+      setIsRegistering(false);
+      return;
+    }
+
+    try {
+      const hashedPassword = await hashPassword(cleanPassword);
+      const roleTitles = {
+        manager: 'Branch Manager',
+        chef: 'Head Kitchen Chef',
+        cashier: 'Cashier & Dispatch Lead',
+      };
+      const rolePerms = {
+        manager: ['read', 'create', 'update', 'update_stock'],
+        chef: ['read', 'update_stock'],
+        cashier: ['read', 'update_stock'],
+      };
+
+      const newUser = {
+        id: `user_${Date.now()}`,
+        name: cleanName,
+        email: cleanEmail,
+        password: hashedPassword,
+        role: regRole,
+        title: roleTitles[regRole] || 'Staff Member',
+        outlet: regOutlet,
+        permissions: rolePerms[regRole] || ['read', 'update_stock'],
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      };
+
+      const updatedUsers = [...users, newUser];
+      onUpdateUsers(updatedUsers);
+
+      // Audit and notify
+      triggerAudit('USER_REGISTERED', `New ${regRole.toUpperCase()} account created for ${cleanName} (${cleanEmail}) at ${regOutlet}`);
+
+      // Auto login newly registered management user
+      const session = createSecureSession(newUser);
+      setCurrentUser(session.user);
+      setRegName('');
+      setRegEmail('');
+      setRegPassword('');
+      setAuthMode('login');
+      showToast(`Account created successfully! Welcome to ROMEE Eatery, ${cleanName}.`);
+    } catch (err) {
+      console.error(err);
+      setRegError('Registration failed. Please try again.');
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  // ================= 1C. FORGOT PASSWORD WORKFLOW =================
+  const handleRequestPasswordReset = (e) => {
+    e.preventDefault();
+    setForgotError('');
+    setForgotSuccess('');
+    setIsResettingPass(true);
+
+    const cleanEmail = forgotEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setForgotError('Please enter a valid account email.');
+      setIsResettingPass(false);
+      return;
+    }
+
+    const found = users.find((u) => u.email.toLowerCase() === cleanEmail);
+    if (!found) {
+      setForgotError('No registered account was found with this email address.');
+      setIsResettingPass(false);
+      return;
+    }
+
+    const ticket = createPasswordResetRequest(cleanEmail);
+    setForgotTicket(ticket);
+    setPasswordResetsList(loadPasswordResetsFromStorage());
+    setForgotStep('verify');
+    setForgotSuccess(`Reset ticket generated! A 6-digit verification code has been issued. You can notify the Super Admin via WhatsApp or enter the code below.`);
+    triggerAudit('PASSWORD_RESET_REQUESTED', `Password reset ticket requested for ${cleanEmail} (Ticket Code: ${ticket.code})`);
+    setIsResettingPass(false);
+  };
+
+  const handleConfirmPasswordReset = async (e) => {
+    e.preventDefault();
+    setForgotError('');
+    setForgotSuccess('');
+
+    const cleanCode = forgotCode.trim();
+    const cleanNewPass = forgotNewPass.trim();
+
+    if (!cleanCode || cleanCode.length !== 6) {
+      setForgotError('Please enter the valid 6-digit reset code.');
+      return;
+    }
+
+    if (cleanNewPass.length < 6) {
+      setForgotError('New password must be at least 6 characters.');
+      return;
+    }
+
+    if (!forgotTicket || forgotTicket.code !== cleanCode) {
+      setForgotError('Invalid verification code. Please check the code or request a new one.');
+      return;
+    }
+
+    try {
+      setIsResettingPass(true);
+      const hashedPassword = await hashPassword(cleanNewPass);
+      const updatedUsers = users.map((u) => {
+        if (u.email.toLowerCase() === forgotTicket.email.toLowerCase()) {
+          return { ...u, password: hashedPassword };
+        }
+        return u;
+      });
+      onUpdateUsers(updatedUsers);
+
+      // Mark ticket as resolved
+      const allResets = loadPasswordResetsFromStorage().map((t) => 
+        t.id === forgotTicket.id ? { ...t, status: 'resolved' } : t
+      );
+      savePasswordResetsToStorage(allResets);
+      setPasswordResetsList(allResets);
+
+      triggerAudit('PASSWORD_RESET_COMPLETED', `Password was successfully reset for user ${forgotTicket.email}`);
+      showToast('Password reset successfully! You can now log in.');
+
+      // Return to login
+      setEmailInput(forgotTicket.email);
+      setPasswordInput(cleanNewPass);
+      setAuthMode('login');
+      setForgotStep('request');
+      setForgotTicket(null);
+      setForgotCode('');
+      setForgotNewPass('');
+      setForgotEmail('');
+    } catch (err) {
+      console.error(err);
+      setForgotError('Failed to reset password. Please try again.');
+    } finally {
+      setIsResettingPass(false);
+    }
+  };
+
+  // Superuser direct reset for any staff member in user management table
+  const handleSuperuserDirectReset = async (e) => {
+    e.preventDefault();
+    if (!targetUserForReset || !adminNewUserPassword.trim()) return;
+
+    if (adminNewUserPassword.trim().length < 6) {
+      showToast('Password must be at least 6 characters.');
+      return;
+    }
+
+    try {
+      const hashedPassword = await hashPassword(adminNewUserPassword.trim());
+      const updatedUsers = users.map((u) => 
+        u.id === targetUserForReset.id ? { ...u, password: hashedPassword } : u
+      );
+      onUpdateUsers(updatedUsers);
+      triggerAudit('SUPERUSER_PASSWORD_RESET', `Superuser reset password for user ${targetUserForReset.name} (${targetUserForReset.email})`);
+      showToast(`Password updated for ${targetUserForReset.name}!`);
+      setTargetUserForReset(null);
+      setAdminNewUserPassword('');
+    } catch (err) {
+      console.error(err);
+      showToast('Error updating user password.');
+    }
+  };
+
+  // ================= 1D. CLOUD DATABASE SYNC HANDLERS =================
+  const handleSaveFirebaseConfig = async (e) => {
+    e.preventDefault();
+    if (!firebaseConfigForm.apiKey || !firebaseConfigForm.projectId) {
+      showToast('API Key and Project ID are required.');
+      return;
+    }
+    const success = saveFirebaseConfig(firebaseConfigForm);
+    if (success) {
+      showToast('Firebase credentials saved! Synchronizing all records to Cloud Firestore...');
+      setCloudStatusNotice('Connected to Cloud Firestore');
+      try {
+        await pushAllDataToCloud({
+          menu: menuItems,
+          settings: settingsForm,
+          staff: staffMembers,
+          ambience: ambienceMedia,
+          users: users,
+        });
+        triggerAudit('CLOUD_DATABASE_CONNECTED', 'Connected Firebase Cloud Firestore and auto-synced all live sections');
+        showToast('✓ Success! Central Database connected and synchronized in real time.');
+      } catch (err) {
+        showToast('Connected, but initial sync error: ' + err.message);
+      }
+    } else {
+      showToast('Error saving configuration.');
+    }
+  };
+
+  const handleClearCloudCredentials = () => {
+    clearFirebaseConfig();
+    setFirebaseConfigForm({
+      apiKey: '',
+      authDomain: '',
+      projectId: '',
+      storageBucket: '',
+      messagingSenderId: '',
+      appId: '',
+    });
+    showToast('Cloud credentials cleared. Local storage mode active.');
+  };
+
+  const handlePushAllToCloud = async () => {
+    setIsSyncingCloud(true);
+    const res = await pushAllDataToCloud({
+      menu: menuItems,
+      settings: settingsForm,
+      staff: staffMembers,
+      ambience: ambienceMedia,
+      users: users,
+    });
+    setIsSyncingCloud(false);
+    if (res.success) {
+      triggerAudit('CLOUD_SYNC_PUSH', 'Pushed all local device data to Cloud Firestore');
+      showToast('✓ Success! All dishes, staff, and settings saved to Global Cloud Database.');
+    } else {
+      showToast('Sync error: ' + (res.error || 'Failed to connect.'));
+    }
+  };
+
+  const handlePullAllFromCloud = async () => {
+    setIsSyncingCloud(true);
+    const data = await pullAllDataFromCloud();
+    setIsSyncingCloud(false);
+    if (data) {
+      if (data.menu) onUpdateMenuItems(data.menu);
+      if (data.settings) onUpdateSettings(data.settings);
+      if (data.staff) onUpdateStaff(data.staff);
+      if (data.ambience) onUpdateAmbience(data.ambience);
+      if (data.users) onUpdateUsers(data.users);
+      triggerAudit('CLOUD_SYNC_PULL', 'Pulled latest global data from Cloud Firestore');
+      showToast('✓ Success! Local device synchronized with Cloud Database.');
+    } else {
+      showToast('Could not fetch cloud data. Check connection.');
+    }
   };
 
   // Image compression
@@ -691,9 +1061,11 @@ export const AdminDashboard = ({
     if (rawRole === 'superuser') permissions.push('all');
 
     // Securely hash password if newly provided
-    let finalPassword = editingUser?.password || '1234';
+    let finalPassword = editingUser?.password;
     if (rawPassword) {
       finalPassword = await hashPassword(rawPassword);
+    } else if (!finalPassword) {
+      finalPassword = await hashPassword(generateSalt(12));
     }
 
     const userData = {
@@ -938,108 +1310,399 @@ export const AdminDashboard = ({
           </div>
         )}
 
-        {/* AUTHENTICATION SCREEN: Email & Password */}
+        {/* AUTHENTICATION SCREEN: Multi-Mode Production System (Sign In, Self-Registration, Forgot Password) */}
         {!currentUser ? (
-          <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
-            <div className="max-w-md w-full bg-petrol-950/90 border border-mustard/30 rounded-3xl p-8 text-center space-y-6 shadow-2xl">
+          <div className="flex-1 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+            <div className="max-w-md w-full bg-petrol-950/95 border border-mustard/30 rounded-3xl p-6 sm:p-8 text-center space-y-6 shadow-2xl my-auto">
               
               <div className="w-20 h-20 rounded-2xl bg-black border-2 border-mustard/50 flex items-center justify-center mx-auto shadow-xl p-1.5 overflow-hidden">
                 <img src="/images/romee-logo.jpg" alt="ROMEE Logo" className="w-full h-full object-contain" />
               </div>
 
+              {/* Mode Header */}
               <div>
-                <h3 className="font-serif text-2xl font-bold text-white">Administrator Sign In</h3>
+                <h3 className="font-serif text-2xl font-bold text-white">
+                  {authMode === 'login' && 'Administrator & Staff Sign In'}
+                  {authMode === 'register' && 'Create Staff Account'}
+                  {authMode === 'forgot' && 'Reset Account Password'}
+                </h3>
                 <p className="text-xs text-slate-400 mt-1">
                   ROMEE Go-Bite Eatery — <span className="italic text-slate-300">...serving the difference</span>
                 </p>
-                <div className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 font-semibold mt-2 px-2.5 py-0.5 rounded-full bg-emerald-950 border border-emerald-800">
+                <div className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 font-semibold mt-2 px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-800">
                   <ShieldCheck className="w-3 h-3" />
-                  <span>Brute-force protection & Anti-injection shield active</span>
+                  <span>Brute-force lockout & Anti-injection encryption active</span>
                 </div>
               </div>
 
-              {/* Quick Fill Preset Pills */}
-              <div className="bg-petrol-900/80 p-3 rounded-2xl border border-petrol-800 text-left space-y-2">
-                <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">
-                  Verified Administrator Credentials:
-                </span>
-                <div className="flex flex-col gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmailInput('salamiabdullahi247@gmail.com');
-                      setPasswordInput('1234');
-                    }}
-                    className="w-full px-3 py-1.5 rounded-xl bg-petrol-950 hover:bg-mustard/20 text-slate-200 hover:text-mustard text-xs font-semibold flex items-center justify-between border border-petrol-700 transition-colors"
-                  >
-                    <span>👑 Superuser (Abdullahi Salami)</span>
-                    <span className="text-[10px] text-mustard font-mono">1234</span>
-                  </button>
+              {/* ---------------- 1. SIGN IN FORM ---------------- */}
+              {authMode === 'login' && (
+                <form onSubmit={handleLoginSubmit} className="space-y-4 text-left">
+                  <div>
+                    <label className="block text-slate-300 text-xs font-semibold mb-1">
+                      Official Email Address
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="email"
+                        value={emailInput}
+                        onChange={(e) => setEmailInput(e.target.value)}
+                        placeholder="Enter your registered email"
+                        className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 pl-9 pr-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
+                        required
+                        autoFocus
+                      />
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-slate-300 text-xs font-semibold">
+                        Password
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode('forgot');
+                          setForgotError('');
+                          setForgotSuccess('');
+                          setForgotEmail(emailInput);
+                        }}
+                        className="text-[11px] text-mustard hover:underline font-semibold"
+                      >
+                        Forgot Password?
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={passwordInput}
+                        onChange={(e) => setPasswordInput(e.target.value)}
+                        placeholder="Enter your account password"
+                        className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 pl-9 pr-10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
+                        required
+                      />
+                      <Key className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 text-slate-400 hover:text-slate-200"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <label className="flex items-center gap-2 cursor-pointer select-none text-slate-400">
+                      <input
+                        type="checkbox"
+                        checked={rememberEmail}
+                        onChange={(e) => setRememberEmail(e.target.checked)}
+                        className="rounded border-petrol-700 bg-petrol-900 text-mustard focus:ring-mustard w-3.5 h-3.5"
+                      />
+                      <span>Remember email</span>
+                    </label>
+
+                    <span className="text-[10px] text-slate-500">
+                      Flagship Hub: Adebayo, Ado-Ekiti
+                    </span>
+                  </div>
+
+                  {authError && (
+                    <div className="p-3 rounded-xl bg-red-950/80 border border-red-500/40 text-red-300 text-xs flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{authError}</span>
+                    </div>
+                  )}
 
                   <button
-                    type="button"
-                    onClick={() => {
-                      setEmailInput('manager@romeegobite.com');
-                      setPasswordInput('1234');
-                    }}
-                    className="w-full px-3 py-1.5 rounded-xl bg-petrol-950 hover:bg-emerald-500/20 text-slate-200 hover:text-emerald-400 text-xs font-semibold flex items-center justify-between border border-petrol-700 transition-colors"
+                    type="submit"
+                    disabled={isLoggingIn}
+                    className="w-full py-3 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold text-xs uppercase tracking-wider shadow-lg transition-transform hover:scale-[1.01] disabled:opacity-50"
                   >
-                    <span>👔 General Manager (Folashade)</span>
-                    <span className="text-[10px] text-emerald-400 font-mono">1234</span>
+                    {isLoggingIn ? 'Authenticating Securely...' : 'Sign In to Management Portal'}
                   </button>
-                </div>
-              </div>
 
-              <form onSubmit={handleLoginSubmit} className="space-y-4 text-left">
-                <div>
-                  <label className="block text-slate-300 text-xs font-semibold mb-1">
-                    Superuser Email Address
-                  </label>
-                  <div className="relative">
+                  <div className="pt-3 border-t border-petrol-800/80 text-center space-y-2">
+                    <p className="text-xs text-slate-400">
+                      New management team member?
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAuthMode('register');
+                        setRegError('');
+                      }}
+                      className="w-full py-2.5 rounded-xl bg-petrol-900 hover:bg-petrol-800 text-slate-200 hover:text-white text-xs font-semibold border border-petrol-700 transition-colors"
+                    >
+                      Create Management / Staff Account
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* ---------------- 2. SELF-REGISTRATION FORM ---------------- */}
+              {authMode === 'register' && (
+                <form onSubmit={handleRegisterSubmit} className="space-y-3.5 text-left">
+                  <div>
+                    <label className="block text-slate-300 text-xs font-semibold mb-1">
+                      Full Legal Name
+                    </label>
+                    <input
+                      type="text"
+                      value={regName}
+                      onChange={(e) => setRegName(e.target.value)}
+                      placeholder="e.g. Adebayo Omotayo"
+                      className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 px-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 text-xs font-semibold mb-1">
+                      Staff Email Address
+                    </label>
                     <input
                       type="email"
-                      value={emailInput}
-                      onChange={(e) => setEmailInput(e.target.value)}
-                      placeholder="e.g. salamiabdullahi247@gmail.com"
-                      className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 pl-9 pr-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      placeholder="e.g. manager@romeeeatery.com.ng"
+                      className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 px-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
                       required
                     />
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
                   </div>
+
+                  <div>
+                    <label className="block text-slate-300 text-xs font-semibold mb-1">
+                      Choose Password (min 6 characters)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        placeholder="Create a strong password"
+                        className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 pl-3 pr-10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
+                        required
+                        minLength={6}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 text-slate-400 hover:text-slate-200"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-300 text-xs font-semibold mb-1">
+                        Management Role
+                      </label>
+                      <select
+                        value={regRole}
+                        onChange={(e) => setRegRole(e.target.value)}
+                        className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-mustard"
+                      >
+                        <option value="manager">Branch Manager</option>
+                        <option value="chef">Kitchen Head Chef</option>
+                        <option value="cashier">Cashier & Dispatch Lead</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 text-xs font-semibold mb-1">
+                        Assigned Outlet
+                      </label>
+                      <select
+                        value={regOutlet}
+                        onChange={(e) => setRegOutlet(e.target.value)}
+                        className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-mustard"
+                      >
+                        <option value="Adebayo Flagship Outlet">Adebayo Flagship (Dine-In)</option>
+                        <option value="Ado-Ekiti Express Dispatch Depot">Ado-Ekiti Express Depot</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {regError && (
+                    <div className="p-3 rounded-xl bg-red-950/80 border border-red-500/40 text-red-300 text-xs flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{regError}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isRegistering}
+                    className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg transition-transform hover:scale-[1.01] disabled:opacity-50"
+                  >
+                    {isRegistering ? 'Registering Account...' : 'Complete Registration & Sign In'}
+                  </button>
+
+                  <div className="pt-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setAuthMode('login')}
+                      className="text-xs text-slate-400 hover:text-mustard hover:underline"
+                    >
+                      Already have an account? Return to Sign In
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* ---------------- 3. FORGOT PASSWORD WORKFLOW ---------------- */}
+              {authMode === 'forgot' && (
+                <div className="space-y-4 text-left">
+                  {forgotStep === 'request' ? (
+                    <form onSubmit={handleRequestPasswordReset} className="space-y-4">
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        Enter your registered email address below. A 6-digit password reset ticket will be generated and you will be provided a direct WhatsApp alert link to the Super Admin.
+                      </p>
+
+                      <div>
+                        <label className="block text-slate-300 text-xs font-semibold mb-1">
+                          Account Email Address
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="email"
+                            value={forgotEmail}
+                            onChange={(e) => setForgotEmail(e.target.value)}
+                            placeholder="e.g. salamiabdullahi247@gmail.com"
+                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 pl-9 pr-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
+                            required
+                            autoFocus
+                          />
+                          <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                        </div>
+                      </div>
+
+                      {forgotError && (
+                        <div className="p-3 rounded-xl bg-red-950/80 border border-red-500/40 text-red-300 text-xs flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                          <span>{forgotError}</span>
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={isResettingPass}
+                        className="w-full py-3 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold text-xs uppercase tracking-wider shadow-lg transition-transform hover:scale-[1.01] disabled:opacity-50"
+                      >
+                        {isResettingPass ? 'Generating Reset Ticket...' : 'Request Password Reset Code'}
+                      </button>
+
+                      <div className="text-center pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setAuthMode('login')}
+                          className="text-xs text-slate-400 hover:text-mustard hover:underline"
+                        >
+                          Return to Sign In
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleConfirmPasswordReset} className="space-y-4">
+                      {forgotSuccess && (
+                        <div className="p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs space-y-2">
+                          <div className="flex items-center gap-2 font-bold">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            <span>Verification Code Issued:</span>
+                          </div>
+                          <div className="p-2 rounded-lg bg-black/60 font-mono text-center text-lg tracking-widest text-mustard border border-mustard/30">
+                            {forgotTicket?.code}
+                          </div>
+                          <p className="text-[11px] text-slate-300">
+                            You can notify the Super Admin directly via WhatsApp to review and approve your request.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Direct WhatsApp ping button to Super Admin */}
+                      {forgotTicket && (
+                        <a
+                          href={createPasswordResetWhatsAppUrl(forgotTicket, settings.whatsappNumber || '07068371295')}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-2.5 rounded-xl bg-emerald-900/60 hover:bg-emerald-800/80 text-emerald-300 border border-emerald-700/60 text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+                        >
+                          <MessageCircle className="w-4 h-4 text-emerald-400" />
+                          <span>Notify Super Admin on WhatsApp ({settings.whatsappNumber || '07068371295'})</span>
+                        </a>
+                      )}
+
+                      <div>
+                        <label className="block text-slate-300 text-xs font-semibold mb-1">
+                          Enter 6-Digit Verification Code
+                        </label>
+                        <input
+                          type="text"
+                          value={forgotCode}
+                          onChange={(e) => setForgotCode(e.target.value)}
+                          placeholder="e.g. 582914"
+                          maxLength={6}
+                          className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 px-3 text-xs text-white font-mono tracking-widest placeholder-slate-500 focus:outline-none focus:border-mustard"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 text-xs font-semibold mb-1">
+                          New Secure Password (min 6 characters)
+                        </label>
+                        <input
+                          type="password"
+                          value={forgotNewPass}
+                          onChange={(e) => setForgotNewPass(e.target.value)}
+                          placeholder="Enter your new password"
+                          className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 px-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
+                          required
+                          minLength={6}
+                        />
+                      </div>
+
+                      {forgotError && (
+                        <div className="p-3 rounded-xl bg-red-950/80 border border-red-500/40 text-red-300 text-xs flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                          <span>{forgotError}</span>
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={isResettingPass}
+                        className="w-full py-3 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold text-xs uppercase tracking-wider shadow-lg transition-transform hover:scale-[1.01] disabled:opacity-50"
+                      >
+                        {isResettingPass ? 'Updating Password...' : 'Verify Code & Set New Password'}
+                      </button>
+
+                      <div className="flex items-center justify-between text-xs pt-1 text-slate-400">
+                        <button
+                          type="button"
+                          onClick={() => setForgotStep('request')}
+                          className="hover:underline text-slate-400"
+                        >
+                          Request another code
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAuthMode('login')}
+                          className="hover:underline text-mustard"
+                        >
+                          Cancel & Return to Sign In
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
-
-                <div>
-                  <label className="block text-slate-300 text-xs font-semibold mb-1">
-                    Superuser Password / PIN
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      value={passwordInput}
-                      onChange={(e) => setPasswordInput(e.target.value)}
-                      placeholder="Enter password"
-                      className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 pl-9 pr-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
-                      required
-                    />
-                    <Key className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-                  </div>
-                </div>
-
-                {authError && (
-                  <div className="p-3 rounded-xl bg-red-950/80 border border-red-500/40 text-red-300 text-xs flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>{authError}</span>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isLoggingIn}
-                  className="w-full py-3 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold text-xs uppercase tracking-wider shadow-lg transition-transform hover:scale-[1.01] disabled:opacity-50"
-                >
-                  {isLoggingIn ? 'Verifying Credentials...' : 'Sign In to Management Portal'}
-                </button>
-              </form>
+              )}
 
             </div>
           </div>
@@ -1134,6 +1797,9 @@ export const AdminDashboard = ({
                 >
                   <Settings className="w-4 h-4" />
                   <span>Production Settings</span>
+                  {isCloudReady && (
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Cloud Database Connected"></span>
+                  )}
                 </button>
               </div>
 
@@ -1537,7 +2203,18 @@ export const AdminDashboard = ({
                               </span>
                             </td>
                             <td className="p-3.5 text-right">
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-2.5">
+                                <button
+                                  onClick={() => {
+                                    setTargetUserForReset(u);
+                                    setAdminNewUserPassword('');
+                                  }}
+                                  className="text-slate-300 hover:text-white hover:underline text-[11px] font-bold flex items-center gap-1"
+                                  title="Set new password for this user"
+                                >
+                                  <Key className="w-3 h-3 text-mustard" />
+                                  <span>Reset PIN</span>
+                                </button>
                                 <button
                                   onClick={() => handleOpenEditUser(u)}
                                   className="text-mustard hover:underline text-[11px] font-bold"
@@ -1559,6 +2236,83 @@ export const AdminDashboard = ({
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Pending Password Reset Tickets (Superuser Approval & Sync) */}
+                  <div className="bg-petrol-950/70 p-5 rounded-2xl border border-petrol-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Key className="w-4 h-4 text-mustard" />
+                        <h4 className="font-serif font-bold text-sm text-white">
+                          Staff Password Reset Requests
+                        </h4>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full bg-petrol-900 text-[10px] font-mono text-slate-400 border border-petrol-800">
+                        {passwordResetsList.filter((r) => r.status === 'pending').length} Pending Request(s)
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Staff members who forget their credentials submit reset tickets that ping your WhatsApp hotline. You can approve and set their new password below.
+                    </p>
+
+                    {passwordResetsList.filter((r) => r.status === 'pending').length === 0 ? (
+                      <div className="p-3.5 rounded-xl bg-petrol-900/40 border border-petrol-800/60 text-center text-xs text-slate-500 italic">
+                        No pending staff password reset requests at this time.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {passwordResetsList.filter((r) => r.status === 'pending').map((ticket) => (
+                          <div 
+                            key={ticket.id} 
+                            className="p-3.5 rounded-xl bg-petrol-900/80 border border-petrol-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-white">{ticket.email}</span>
+                                <span className="px-2 py-0.5 rounded bg-mustard/20 text-mustard font-mono font-bold text-[11px] border border-mustard/40">
+                                  Code: {ticket.code}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-400">
+                                Requested: {new Date(ticket.requestedAt).toLocaleString()}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                onClick={() => {
+                                  const u = users.find((user) => user.email.toLowerCase() === ticket.email.toLowerCase());
+                                  if (u) {
+                                    setTargetUserForReset(u);
+                                    setAdminNewUserPassword('');
+                                  } else {
+                                    showToast('User account not found.');
+                                  }
+                                }}
+                                className="px-3 py-1.5 rounded-lg bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold text-xs shadow-sm"
+                              >
+                                Approve & Set Password
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const updated = passwordResetsList.map((r) => 
+                                    r.id === ticket.id ? { ...r, status: 'dismissed' } : r
+                                  );
+                                  savePasswordResetsToStorage(updated);
+                                  setPasswordResetsList(updated);
+                                  showToast('Reset ticket dismissed.');
+                                }}
+                                className="px-2.5 py-1.5 rounded-lg bg-petrol-950 hover:bg-red-950 text-slate-400 hover:text-red-300 text-xs border border-petrol-800"
+                              >
+                                Dismiss
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                 </div>
               )}
 
@@ -1827,7 +2581,7 @@ export const AdminDashboard = ({
                               type="text"
                               value={settingsForm.dineInName || ''}
                               onChange={(e) => setSettingsForm({ ...settingsForm, dineInName: e.target.value })}
-                              placeholder="Victoria Island / Lekki Flagship Hub"
+                              placeholder="Adebayo Flagship Outlet (Dine-In Lounge & Go Bites)"
                               className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
                             />
                           </div>
@@ -1850,7 +2604,7 @@ export const AdminDashboard = ({
                             type="text"
                             value={settingsForm.dineInAddress || ''}
                             onChange={(e) => setSettingsForm({ ...settingsForm, dineInAddress: e.target.value })}
-                            placeholder="Plot 14B, Admiralty Way / Adeola Odeku Corridor, Victoria Island, Lagos"
+                            placeholder="Adebayo Area, Along Iworoko Road, Ado-Ekiti, Ekiti State"
                             className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
                           />
                         </div>
@@ -1862,7 +2616,7 @@ export const AdminDashboard = ({
                               type="text"
                               value={settingsForm.dineInGoogleMapsUrl || ''}
                               onChange={(e) => setSettingsForm({ ...settingsForm, dineInGoogleMapsUrl: e.target.value })}
-                              placeholder="https://maps.google.com/?q=Victoria+Island+Lagos"
+                              placeholder="https://maps.google.com/?q=Adebayo+Ado-Ekiti+Ekiti+State"
                               className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
                             />
                           </div>
@@ -1896,7 +2650,7 @@ export const AdminDashboard = ({
                               type="text"
                               value={settingsForm.goBitesName || ''}
                               onChange={(e) => setSettingsForm({ ...settingsForm, goBitesName: e.target.value })}
-                              placeholder="Mainland Express Dispatch Depot"
+                              placeholder="Ado-Ekiti Express Dispatch Depot"
                               className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
                             />
                           </div>
@@ -1907,7 +2661,7 @@ export const AdminDashboard = ({
                               type="text"
                               value={settingsForm.goBitesHours || ''}
                               onChange={(e) => setSettingsForm({ ...settingsForm, goBitesHours: e.target.value })}
-                              placeholder="Mon - Sat: 7:30 AM – 9:00 PM (Sundays: 12 PM - 8 PM)"
+                              placeholder="Mon - Sat: 7:30 AM – 9:30 PM (Sundays: 12 PM - 8:30 PM)"
                               className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
                             />
                           </div>
@@ -1919,7 +2673,7 @@ export const AdminDashboard = ({
                             type="text"
                             value={settingsForm.goBitesAddress || ''}
                             onChange={(e) => setSettingsForm({ ...settingsForm, goBitesAddress: e.target.value })}
-                            placeholder="42 Allen Avenue (Opposite Oshopey Plaza), Ikeja, Lagos"
+                            placeholder="Opposite EKSU Junction / Adebayo Commercial Axis, Ado-Ekiti, Ekiti State"
                             className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
                           />
                         </div>
@@ -1931,7 +2685,7 @@ export const AdminDashboard = ({
                               type="text"
                               value={settingsForm.goBitesGoogleMapsUrl || ''}
                               onChange={(e) => setSettingsForm({ ...settingsForm, goBitesGoogleMapsUrl: e.target.value })}
-                              placeholder="https://maps.google.com/?q=Allen+Avenue+Ikeja+Lagos"
+                              placeholder="https://maps.google.com/?q=EKSU+Junction+Adebayo+Ado-Ekiti"
                               className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
                             />
                           </div>
@@ -2097,6 +2851,45 @@ export const AdminDashboard = ({
                       </div>
                     </div>
 
+                    {/* SECTION E: HOW-TO-ORDER VIDEO WALKTHROUGH */}
+                    <div className="bg-petrol-950/70 p-6 rounded-2xl border border-petrol-800 space-y-4">
+                      <div className="flex items-center gap-2 text-mustard">
+                        <Video className="w-5 h-5" />
+                        <h3 className="font-serif font-bold text-base text-white">Ordering Walkthrough Video Guide</h3>
+                      </div>
+
+                      <p className="text-slate-300 text-xs leading-relaxed">
+                        Paste the YouTube link (e.g. <code className="text-mustard">https://www.youtube.com/watch?v=...</code>) or MP4 video URL that teaches customers how to navigate the website and place orders on WhatsApp.
+                      </p>
+
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">
+                            Video Tutorial Link / YouTube Embed URL
+                          </label>
+                          <input
+                            type="text"
+                            value={settingsForm.tutorialVideoUrl || ''}
+                            onChange={(e) => setSettingsForm({ ...settingsForm, tutorialVideoUrl: e.target.value })}
+                            placeholder="e.g. https://www.youtube.com/watch?v=YOUR_VIDEO_ID or /videos/tutorial.mp4"
+                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                          />
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            This video is displayed in the "How to Use the Website & Order on WhatsApp" section on the home page.
+                          </p>
+                        </div>
+
+                        {settingsForm.tutorialVideoUrl?.trim() && (
+                          <div className="p-3 rounded-xl bg-petrol-900/80 border border-petrol-700 space-y-2">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Video URL Preview Detected:</span>
+                            <div className="text-xs text-emerald-400 font-mono break-all">
+                              {settingsForm.tutorialVideoUrl}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     {settingsSavedNotice && (
                       <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold text-center text-xs">
                         ✓ All settings, seasonal theme, physical addresses, and popup configs saved successfully!
@@ -2155,6 +2948,150 @@ export const AdminDashboard = ({
                     </div>
                   </div>
 
+                  {/* Central Cloud Database Connection (Firebase Firestore) */}
+                  <div id="cloud-credentials-setup" className="bg-petrol-950/70 p-6 rounded-2xl border border-petrol-800 space-y-4">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2 text-mustard">
+                        <Database className="w-5 h-5" />
+                        <h4 className="font-serif font-bold text-base text-white">
+                          Central Cloud Database Sync (Google Firebase Firestore)
+                        </h4>
+                        {isCloudReady ? (
+                          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                            ✓ Live Connected
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                            Local Storage Mode
+                          </span>
+                        )}
+                      </div>
+
+                      {isCloudReady && (
+                        <button
+                          type="button"
+                          onClick={handleClearCloudCredentials}
+                          className="text-xs text-red-400 hover:text-red-300 hover:underline"
+                        >
+                          Disconnect Credentials
+                        </button>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Connect your 100% free Google Firebase Cloud Firestore database to enable permanent, automatic real-time sync across all phones, tablets, and computers. Any menu changes, price updates, or orders made on any device reflect globally without any manual push or pull buttons.
+                    </p>
+
+                    <form onSubmit={handleSaveFirebaseConfig} className="space-y-4 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">
+                            Firebase API Key <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={firebaseConfigForm.apiKey || ''}
+                            onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, apiKey: e.target.value.trim() })}
+                            placeholder="AIzaSy..."
+                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">
+                            Firebase Project ID <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={firebaseConfigForm.projectId || ''}
+                            onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, projectId: e.target.value.trim() })}
+                            placeholder="romee-eatery-XXXXX"
+                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">
+                            Auth Domain (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={firebaseConfigForm.authDomain || ''}
+                            onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, authDomain: e.target.value.trim() })}
+                            placeholder="romee-eatery.firebaseapp.com"
+                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">
+                            Storage Bucket (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={firebaseConfigForm.storageBucket || ''}
+                            onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, storageBucket: e.target.value.trim() })}
+                            placeholder="romee-eatery.appspot.com"
+                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">
+                            Messaging Sender ID (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={firebaseConfigForm.messagingSenderId || ''}
+                            onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, messagingSenderId: e.target.value.trim() })}
+                            placeholder="104928374619"
+                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-semibold mb-1">
+                            App ID (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={firebaseConfigForm.appId || ''}
+                            onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, appId: e.target.value.trim() })}
+                            placeholder="1:104928374619:web:abcdef"
+                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-petrol-800">
+                        <span className="text-[11px] text-slate-400">
+                          {isCloudReady ? '✓ Connection active — auto-syncing in background' : 'Free tier: 1 GB storage & 50,000 reads/day'}
+                        </span>
+
+                        <button
+                          type="submit"
+                          className="px-6 py-2.5 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold text-xs uppercase tracking-wider shadow-md transition-transform hover:scale-105"
+                        >
+                          Save & Connect Central Database
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Quick Step-by-Step Instructions */}
+                    <div className="p-4 rounded-xl bg-petrol-900/60 border border-petrol-800 space-y-2 text-xs text-slate-300">
+                      <span className="font-bold text-mustard block">
+                        How to create your free Firebase database in 3 steps:
+                      </span>
+                      <ol className="list-decimal pl-4 space-y-1 text-[11px] text-slate-400">
+                        <li>Visit <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" className="text-mustard underline font-bold">console.firebase.google.com</a> and click <strong>Create a project</strong> (e.g. <em>romee-eatery</em>).</li>
+                        <li>In the left sidebar, click <strong>Build &rarr; Firestore Database</strong> &rarr; click <strong>Create database</strong> (choose "Start in test mode").</li>
+                        <li>Click <strong>Project Settings (gear icon) &rarr; General &rarr; Your apps</strong>, select Web <code>&lt;/&gt;</code>, and paste the values into the fields above.</li>
+                      </ol>
+                    </div>
+                  </div>
+
                   {/* Factory Reset */}
                   <div className="bg-red-950/30 p-6 rounded-2xl border border-red-900/40 flex items-center justify-between gap-4">
                     <div>
@@ -2179,6 +3116,7 @@ export const AdminDashboard = ({
 
                 </div>
               )}
+
 
             </div>
           </div>
@@ -3104,6 +4042,70 @@ export const AdminDashboard = ({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL 8: SUPERUSER DIRECT USER PASSWORD RESET ================= */}
+      {targetUserForReset && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div 
+            onClick={() => setTargetUserForReset(null)} 
+            className="fixed inset-0 bg-petrol-950/80 backdrop-blur-sm" 
+          />
+          <div className="relative w-full max-w-md bg-petrol-900 border border-mustard/40 rounded-3xl p-6 z-10 text-white space-y-4 shadow-2xl text-left">
+            <div className="flex items-center justify-between border-b border-petrol-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Key className="w-5 h-5 text-mustard" />
+                <h3 className="font-serif font-bold text-base text-white">Reset Staff Password</h3>
+              </div>
+              <button
+                onClick={() => setTargetUserForReset(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3 rounded-xl bg-petrol-950 border border-petrol-800 text-xs space-y-1">
+              <p className="text-slate-400">Account: <strong className="text-white">{targetUserForReset.name}</strong></p>
+              <p className="text-slate-400 font-mono text-[11px]">{targetUserForReset.email}</p>
+              <p className="text-[10px] text-mustard font-bold uppercase">{targetUserForReset.role} • {targetUserForReset.outlet || 'All Outlets'}</p>
+            </div>
+
+            <form onSubmit={handleSuperuserDirectReset} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  New Password / PIN for User
+                </label>
+                <input
+                  type="text"
+                  value={adminNewUserPassword}
+                  onChange={(e) => setAdminNewUserPassword(e.target.value)}
+                  placeholder="Enter new secure password (min 6 chars)"
+                  className="w-full bg-petrol-950 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
+                  required
+                  minLength={6}
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-petrol-800">
+                <button
+                  type="button"
+                  onClick={() => setTargetUserForReset(null)}
+                  className="px-4 py-2 rounded-xl bg-petrol-950 hover:bg-petrol-800 text-slate-300 font-bold text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold text-xs uppercase tracking-wider shadow-md"
+                >
+                  Confirm & Update Password
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

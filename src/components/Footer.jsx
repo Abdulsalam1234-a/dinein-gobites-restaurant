@@ -15,8 +15,8 @@ export const Footer = ({ onOpenAdmin, settings = {} }) => {
   const cleanPhone = whatsappNumber.replace(/[^0-9]/g, '');
   const directWhatsAppUrl = `https://wa.me/${cleanPhone.startsWith('0') ? '234' + cleanPhone.slice(1) : cleanPhone}`;
 
-  const dineInTitle = settings.dineInName || 'Victoria Island / Lekki Flagship Hub';
-  const goBitesTitle = settings.goBitesName || 'Mainland Express Dispatch Depot';
+  const dineInTitle = settings.dineInName || 'Adebayo Flagship Outlet (Ado-Ekiti)';
+  const goBitesTitle = settings.goBitesName || 'Ado-Ekiti Express Dispatch Depot';
 
   const handleSubscribe = (e) => {
     e.preventDefault();

@@ -26,17 +26,31 @@ export const CartDrawer = ({
   serviceChargeDineIn = 500,
   packagingFeeGoBites = 300,
   prefilledTable = '',
+  currentCustomer = null,
+  onOpenCustomerAuth = () => {},
 }) => {
   const isDineIn = activeMode === 'dinein';
 
   // Customer Details Form State
   const [customerInfo, setCustomerInfo] = useState({
-    name: '',
+    name: currentCustomer ? currentCustomer.name : '',
     tableNumber: prefilledTable || '',
-    phone: '',
-    location: '',
+    phone: currentCustomer ? currentCustomer.phone : '',
+    location: currentCustomer ? (currentCustomer.address || 'Adebayo, Ado-Ekiti') : '',
     specialInstructions: '',
   });
+
+  // Keep customer details synced if customer logs in or out
+  React.useEffect(() => {
+    if (currentCustomer) {
+      setCustomerInfo((prev) => ({
+        ...prev,
+        name: prev.name || currentCustomer.name || '',
+        phone: prev.phone || currentCustomer.phone || '',
+        location: prev.location || currentCustomer.address || 'Adebayo, Ado-Ekiti',
+      }));
+    }
+  }, [currentCustomer]);
 
   React.useEffect(() => {
     if (prefilledTable) {
@@ -81,6 +95,7 @@ export const CartDrawer = ({
       cart,
       mode: activeMode,
       customerInfo,
+      customer: currentCustomer,
       totals: {
         subtotal,
         serviceCharge: isDineIn ? extraFee : 0,
@@ -254,6 +269,45 @@ export const CartDrawer = ({
           {/* Form for Table / Delivery Location */}
           {cart.length > 0 && (
             <div className="pt-4 border-t border-gold/20 space-y-3.5">
+              
+              {/* Account Status or Gentle Sign-Up Encouragement */}
+              {currentCustomer ? (
+                <div className="p-2.5 rounded-xl bg-petrol-900 border border-gold/30 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-gold/20 text-gold flex items-center justify-center font-black text-[11px]">
+                      {currentCustomer.name ? currentCustomer.name.charAt(0).toUpperCase() : 'U'}
+                    </div>
+                    <div>
+                      <span className="font-bold text-white block leading-tight">
+                        Ordering as {currentCustomer.name}
+                      </span>
+                      <span className="text-[10px] text-emerald-400">
+                        ✓ Order will be saved to your personal history
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-2xl bg-petrol-900/90 border border-gold/30 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-gold flex items-center gap-1.5 text-[11px] uppercase tracking-wide">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Track Orders & Re-Order in 1 Click</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onOpenCustomerAuth()}
+                      className="text-[11px] font-bold text-navy-950 bg-gold hover:bg-gold/90 px-2.5 py-1 rounded-full transition-colors"
+                    >
+                      Sign In / Join (5s)
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-tight">
+                    Guests can also proceed below directly — account creation is completely optional.
+                  </p>
+                </div>
+              )}
+
               <h3 className="text-xs uppercase font-bold tracking-wider text-gold flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5" />
                 {isDineIn ? 'Dine-In Seating Information' : 'Takeaway & Delivery Destination'}

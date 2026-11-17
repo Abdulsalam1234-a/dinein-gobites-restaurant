@@ -242,7 +242,7 @@ export const GalleryPage = ({ ambienceMedia = [] }) => {
               100% Culinary Transparency
             </span>
             <h3 className="text-2xl font-serif font-black text-white">
-              Experience the Cleanest Kitchen in Lagos
+              Experience the Cleanest Kitchen in Ado-Ekiti
             </h3>
             <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
               We take pride in our open-kitchen culture. Come see our stainless steel preparation stations, sanitized swallow kneaders, and sparkling dining floor in person.
