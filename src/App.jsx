@@ -22,6 +22,8 @@ import { MenuPage } from './pages/MenuPage';
 import { GalleryPage } from './pages/GalleryPage';
 import { OutletsPage } from './pages/OutletsPage';
 import { FAQPage } from './pages/FAQPage';
+import { ContactPage } from './pages/ContactPage';
+import { AdminPage } from './pages/AdminPage';
 
 // Data & Storage
 import { 
@@ -84,6 +86,38 @@ export default function App() {
       console.error(e);
     }
   }, [cart]);
+
+  // Live Cart Reconciliation with Backend Menu:
+  // Automatically refreshes prices, titles, or removes dishes if updated/deleted by admin in Cloud Firestore
+  useEffect(() => {
+    if (!Array.isArray(menuItems) || menuItems.length === 0) return;
+    setCart((prevCart) => {
+      if (!Array.isArray(prevCart) || prevCart.length === 0) return prevCart;
+      let hasChanges = false;
+      const updated = prevCart.map((cartItem) => {
+        const liveDish = menuItems.find((m) => m.id === cartItem.id);
+        if (!liveDish) {
+          hasChanges = true;
+          return null;
+        }
+        if (liveDish.price !== cartItem.price || liveDish.name !== cartItem.name || liveDish.image !== cartItem.image) {
+          hasChanges = true;
+          return {
+            ...cartItem,
+            name: liveDish.name,
+            price: liveDish.price,
+            image: liveDish.image || cartItem.image,
+          };
+        }
+        return cartItem;
+      }).filter(Boolean);
+
+      if (updated.length !== prevCart.length) {
+        hasChanges = true;
+      }
+      return hasChanges ? updated : prevCart;
+    });
+  }, [menuItems]);
 
   // Global Real-time Cloud Database Synchronization
   useEffect(() => {
@@ -271,6 +305,8 @@ export default function App() {
       mode,
     });
     setIsCartOpen(false);
+    // Clear out cart so it is fresh for the next order
+    handleClearCart();
   };
 
   // 8. Admin Updates (Local Storage + Global Cloud Database Sync)
@@ -359,7 +395,7 @@ export default function App() {
       <ThemeAmbientEffects themeId={activeThemeId} />
 
       <div 
-        className="min-h-screen text-slate-800 flex flex-col font-sans selection:bg-mustard selection:text-petrol-950 transition-colors duration-500 relative"
+        className="min-h-screen text-slate-800 flex flex-col font-sans selection:bg-mustard selection:text-petrol-950 transition-colors duration-500 relative w-full overflow-x-hidden"
         data-theme={activeThemeId}
       >
         
@@ -394,7 +430,7 @@ export default function App() {
         />
 
         {/* Dynamic Multi-Page Routes */}
-        <main className="flex-1">
+        <main className="flex-1 w-full overflow-x-hidden">
           <Routes>
             <Route 
               path="/" 
@@ -423,6 +459,11 @@ export default function App() {
             />
 
             <Route 
+              path="/about-us" 
+              element={<Navigate to="/about" replace />} 
+            />
+
+            <Route 
               path="/menu" 
               element={
                 <MenuPage
@@ -438,6 +479,40 @@ export default function App() {
                   setSearchQuery={setSearchQuery}
                 />
               } 
+            />
+
+            {/* Dedicated /delights route */}
+            <Route 
+              path="/delights" 
+              element={
+                <MenuPage
+                  menuItems={menuItems}
+                  activeMode={activeMode}
+                  setActiveMode={setActiveMode}
+                  onAddToCart={handleAddToCart}
+                  currency={settings.currency}
+                  cartCount={cartCount}
+                  cartTotal={cartTotal}
+                  onOpenCart={() => setIsCartOpen(true)}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                />
+              } 
+            />
+
+            {/* Dedicated /contact-us and /contact routes */}
+            <Route 
+              path="/contact-us" 
+              element={
+                <ContactPage 
+                  settings={settings}
+                />
+              } 
+            />
+
+            <Route 
+              path="/contact" 
+              element={<Navigate to="/contact-us" replace />} 
             />
 
             <Route 
@@ -463,6 +538,30 @@ export default function App() {
               element={
                 <FAQPage 
                   whatsappNumber={settings.whatsappNumber}
+                />
+              } 
+            />
+
+            {/* Dedicated /admin route (works on mobile, desktop, and tablet directly) */}
+            <Route 
+              path="/admin" 
+              element={
+                <AdminPage
+                  menuItems={menuItems}
+                  onUpdateMenuItems={handleUpdateMenuItems}
+                  settings={settings}
+                  onUpdateSettings={handleUpdateSettings}
+                  onResetDefaults={handleResetDefaults}
+                  currency={settings.currency}
+                  staffMembers={staffMembers}
+                  onUpdateStaff={handleUpdateStaff}
+                  ambienceMedia={ambienceMedia}
+                  onUpdateAmbience={handleUpdateAmbience}
+                  users={users}
+                  onUpdateUsers={handleUpdateUsers}
+                  auditLogs={auditLogs}
+                  onAddAuditLog={handleAddAuditLog}
+                  onClearAuditLogs={handleClearAuditLogs}
                 />
               } 
             />

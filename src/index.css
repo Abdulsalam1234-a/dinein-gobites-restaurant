@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+  scroll-behavior: smooth;
+}
+
 /* ══════════════════════════════════════════════════════════════════
    1. DYNAMIC SEASONAL THEMES CSS VARIABLES ENGINE
    Values are space-separated RGB numbers to support Tailwind opacity (e.g. bg-petrol-900/80)

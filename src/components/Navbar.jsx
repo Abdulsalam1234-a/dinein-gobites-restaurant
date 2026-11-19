@@ -85,40 +85,46 @@ export const Navbar = ({
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-6 lg:gap-7">
+          <nav className="hidden md:flex items-center gap-3 lg:gap-5 xl:gap-6">
             <NavLink to="/" end className={navLinkClass}>
               Home
             </NavLink>
-            <NavLink to="/about" className={navLinkClass}>
-              About Us & Staff
+            <NavLink to="/delights" className={navLinkClass}>
+              Delights
             </NavLink>
             <NavLink to="/menu" className={navLinkClass}>
-              Our Menu
+              Menu
+            </NavLink>
+            <NavLink to="/about" className={navLinkClass}>
+              About Us
+            </NavLink>
+            <NavLink to="/contact-us" className={navLinkClass}>
+              Contact Us
             </NavLink>
             <NavLink to="/gallery" className={navLinkClass}>
-              Virtual Tour & Ambience
+              Virtual Tour
             </NavLink>
             <NavLink to="/outlets" className={navLinkClass}>
-              Outlets & Seating
+              Outlets
             </NavLink>
             <NavLink to="/faqs" className={navLinkClass}>
               FAQs
             </NavLink>
           </nav>
 
-          {/* Right Action Icons: Search, WhatsApp Contact Us, Cart, Admin */}
-          <div className="flex items-center gap-3">
+          {/* Right Action Icons: Search, Contact Us, Cart, Admin */}
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
             
             {/* Search Input on Desktop */}
-            <form onSubmit={handleSearchSubmit} className="relative hidden lg:block w-40 xl:w-48">
+            <form onSubmit={handleSearchSubmit} className="relative hidden xl:block w-36">
               <input
                 type="text"
                 placeholder="Search food..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => {
-                  if (window.location.pathname !== '/menu') {
-                    navigate('/menu');
+                  if (window.location.pathname !== '/menu' && window.location.pathname !== '/delights') {
+                    navigate('/delights');
                   }
                 }}
                 className="w-full bg-petrol-950/70 border border-petrol-700 rounded-full py-1.5 pl-8 pr-3 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-mustard transition-all"
@@ -139,32 +145,31 @@ export const Navbar = ({
             <button
               onClick={() => {
                 setShowSearchInput(!showSearchInput);
-                if (!showSearchInput && window.location.pathname !== '/menu') {
-                  navigate('/menu');
+                if (!showSearchInput && window.location.pathname !== '/menu' && window.location.pathname !== '/delights') {
+                  navigate('/delights');
                 }
               }}
-              className="lg:hidden p-2 text-slate-200 hover:text-mustard"
+              className="xl:hidden p-2 text-slate-200 hover:text-mustard shrink-0"
               title="Search menu"
             >
               <Search className="w-4 h-4" />
             </button>
 
-            {/* Contact Us / WhatsApp Pill Button */}
-            <a
-              href={directWhatsAppUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-300/40 hover:border-mustard text-xs font-semibold hover:text-mustard transition-colors"
+            {/* Contact Us Page Button */}
+            <Link
+              to="/contact-us"
+              className="hidden lg:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-slate-300/40 hover:border-mustard text-xs font-semibold text-slate-200 hover:text-mustard transition-colors shrink-0"
+              title="Contact Us & Outlets"
             >
               <MessageCircle className="w-3.5 h-3.5 text-mustard" />
               <span>Contact us</span>
-            </a>
+            </Link>
 
             {/* Customer Account Pill */}
             {currentCustomer ? (
               <button
                 onClick={onOpenCustomerAccount}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-petrol-800 hover:bg-petrol-700 border border-mustard/40 text-xs font-semibold text-white transition-all shadow-sm"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-petrol-800 hover:bg-petrol-700 border border-mustard/40 text-xs font-semibold text-white transition-all shadow-sm shrink-0"
                 title="My Customer Account & Past Orders"
               >
                 <div className="w-5 h-5 rounded-full bg-mustard text-petrol-950 flex items-center justify-center font-black text-[10px]">
@@ -177,7 +182,7 @@ export const Navbar = ({
             ) : (
               <button
                 onClick={onOpenCustomerAuth}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-petrol-800/80 hover:bg-petrol-800 border border-slate-700 hover:border-mustard text-xs font-semibold text-slate-200 hover:text-mustard transition-colors"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-petrol-800/80 hover:bg-petrol-800 border border-slate-700 hover:border-mustard text-xs font-semibold text-slate-200 hover:text-mustard transition-colors shrink-0"
                 title="Sign in or create account to track orders"
               >
                 <User className="w-3.5 h-3.5 text-mustard" />
@@ -188,7 +193,7 @@ export const Navbar = ({
             {/* Shopping Plate / Bag Button */}
             <button
               onClick={onOpenCart}
-              className="relative flex items-center gap-2 bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold px-3.5 sm:px-4 py-2 rounded-full text-xs shadow-md transition-all hover:scale-105"
+              className="relative flex items-center gap-1.5 sm:gap-2 bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold px-3 sm:px-4 py-2 rounded-full text-xs shadow-md transition-all hover:scale-105 shrink-0"
             >
               <ShoppingBag className="w-4 h-4" />
               <span className="hidden sm:inline font-bold">
@@ -201,19 +206,19 @@ export const Navbar = ({
               )}
             </button>
 
-            {/* Admin Portal Button */}
-            <button
-              onClick={onOpenAdmin}
-              className="p-2 text-slate-300 hover:text-mustard hover:bg-petrol-800 rounded-full transition-all"
-              title="Admin Portal (Manage Menu, Staff & Media)"
+            {/* Admin Portal Button - Always Visible, High Contrast, shrink-0 */}
+            <Link
+              to="/admin"
+              className="p-2 text-mustard hover:text-white bg-petrol-950/80 hover:bg-petrol-800 rounded-full border border-mustard/40 transition-all shrink-0 flex items-center justify-center shadow-sm"
+              title="Admin Portal (Super Admin Login: /admin)"
             >
               <Lock className="w-4 h-4" />
-            </button>
+            </Link>
 
             {/* Mobile Hamburger */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 text-white hover:text-mustard focus:outline-none"
+              className="md:hidden p-2 text-white hover:text-mustard focus:outline-none shrink-0"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <MenuIcon className="w-6 h-6" />}
             </button>
@@ -249,11 +254,11 @@ export const Navbar = ({
               Home
             </NavLink>
             <NavLink
-              to="/about"
+              to="/delights"
               onClick={() => setMobileMenuOpen(false)}
               className={mobileNavLinkClass}
             >
-              About Us & Leadership Staff
+              Culinary Delights & Combos
             </NavLink>
             <NavLink
               to="/menu"
@@ -261,6 +266,20 @@ export const Navbar = ({
               className={mobileNavLinkClass}
             >
               Our Master Menu
+            </NavLink>
+            <NavLink
+              to="/about"
+              onClick={() => setMobileMenuOpen(false)}
+              className={mobileNavLinkClass}
+            >
+              About Us & Leadership Staff
+            </NavLink>
+            <NavLink
+              to="/contact-us"
+              onClick={() => setMobileMenuOpen(false)}
+              className={mobileNavLinkClass}
+            >
+              Contact Us & Locations
             </NavLink>
             <NavLink
               to="/gallery"
@@ -320,16 +339,17 @@ export const Navbar = ({
               <MessageCircle className="w-4 h-4" />
               <span>WhatsApp Us: 07068371295</span>
             </a>
-            <button
+            <Link
+              to="/admin"
               onClick={() => {
-                onOpenAdmin();
+                if (onOpenAdmin) onOpenAdmin();
                 setMobileMenuOpen(false);
               }}
-              className="w-full text-left px-3 py-2 text-mustard hover:bg-petrol-900 rounded-lg flex items-center gap-2 border-t border-petrol-800 pt-3"
+              className="w-full text-left px-3 py-2 text-mustard hover:bg-petrol-900 rounded-lg flex items-center gap-2 border-t border-petrol-800 pt-3 font-bold"
             >
-              <Lock className="w-4 h-4" />
-              <span>Admin Management Portal</span>
-            </button>
+              <Lock className="w-4 h-4 text-mustard" />
+              <span>Admin Management Portal (/admin)</span>
+            </Link>
           </div>
         )}
       </div>

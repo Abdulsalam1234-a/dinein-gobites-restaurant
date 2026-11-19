@@ -122,9 +122,10 @@ export const Footer = ({ onOpenAdmin, settings = {} }) => {
               Dining Services
             </h4>
             <ul className="space-y-2 text-slate-400 text-xs">
+              <li><Link to="/delights" className="hover:text-white transition-colors">Culinary Delights & Combos</Link></li>
               <li><Link to="/menu" className="hover:text-white transition-colors">Dine-In Lounge Swallows</Link></li>
               <li><Link to="/menu" className="hover:text-white transition-colors">Go Bites Express Combos</Link></li>
-              <li><a href={directWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Office & Bulk Catering</a></li>
+              <li><Link to="/contact-us" className="hover:text-white transition-colors">Office & Bulk Catering</Link></li>
               <li><Link to="/outlets" className="hover:text-white transition-colors">Table Priority Booking</Link></li>
             </ul>
           </div>
@@ -139,7 +140,8 @@ export const Footer = ({ onOpenAdmin, settings = {} }) => {
               <li><Link to="/about" className="hover:text-white transition-colors">Managing Director & Staff</Link></li>
               <li><Link to="/gallery" className="hover:text-white transition-colors">Virtual Tour & Kitchen</Link></li>
               <li><Link to="/outlets" className="hover:text-white transition-colors">Outlets & Locations</Link></li>
-              <li><button onClick={onOpenAdmin} className="text-mustard hover:underline flex items-center gap-1"><Lock className="w-3 h-3" /> Admin Portal</button></li>
+              <li><Link to="/contact-us" className="hover:text-white transition-colors">Contact Concierge</Link></li>
+              <li><Link to="/admin" className="text-mustard hover:underline flex items-center gap-1 font-semibold"><Lock className="w-3 h-3" /> Admin Portal (/admin)</Link></li>
             </ul>
           </div>
 
@@ -150,6 +152,7 @@ export const Footer = ({ onOpenAdmin, settings = {} }) => {
             </h4>
             <ul className="space-y-2 text-slate-400 text-xs">
               <li><Link to="/faqs" className="hover:text-white transition-colors">Frequently Asked Questions</Link></li>
+              <li><Link to="/contact-us" className="hover:text-white transition-colors">Customer Care & Feedback</Link></li>
               <li><a href={directWhatsAppUrl} target="_blank" rel="noopener noreferrer" className="text-emerald-400 font-bold flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> {whatsappNumber}</a></li>
               <li className="text-slate-400">{dineInTitle}</li>
               <li className="text-slate-400">{goBitesTitle}</li>

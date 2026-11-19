@@ -30,7 +30,7 @@ export const HomePage = ({
   };
 
   return (
-    <div className="space-y-0">
+    <div className="space-y-0 w-full overflow-x-hidden">
       
       {/* 1. Curved Hero Section: "We serve the taste you love" */}
       <HeroSection
