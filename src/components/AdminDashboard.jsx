@@ -125,6 +125,7 @@ export const AdminDashboard = ({
   const [regOutlet, setRegOutlet] = useState('Adebayo Flagship Outlet (Dine-In Lounge)');
   const [regError, setRegError] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
+  const [regSubmittedUser, setRegSubmittedUser] = useState(null);
 
   // Forgot Password / Reset Flow
   const [forgotEmail, setForgotEmail] = useState('');
@@ -252,6 +253,14 @@ export const AdminDashboard = ({
   if (!isOpen) return null;
 
   const isSuperuser = currentUser?.role === 'superuser';
+  const pendingUsers = users.filter((u) => u.status === 'pending_approval');
+
+  // Enforce access control: non-superadmin users cannot access 'users' or 'audit' tabs
+  useEffect(() => {
+    if (currentUser && !isSuperuser && (activeTab === 'users' || activeTab === 'audit')) {
+      setActiveTab('products');
+    }
+  }, [currentUser, isSuperuser, activeTab]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -299,8 +308,15 @@ export const AdminDashboard = ({
         return;
       }
 
-      if (found.status === 'disabled') {
-        setAuthError('This account has been disabled by the Superuser.');
+      if (found.status === 'pending_approval') {
+        triggerAudit('LOGIN_BLOCKED_PENDING', `Login attempted by pending account: ${cleanEmail}`);
+        setAuthError('Access Denied: Your staff account is currently pending verification & approval by the Super Administrator (Abdullahi Salami). You cannot sign in until approved.');
+        setIsLoggingIn(false);
+        return;
+      }
+
+      if (found.status === 'disabled' || found.status === 'rejected') {
+        setAuthError('Access Denied: This staff account has been deactivated or rejected by the Super Administrator.');
         setIsLoggingIn(false);
         return;
       }
@@ -428,7 +444,7 @@ export const AdminDashboard = ({
         title: roleTitles[regRole] || 'Staff Member',
         outlet: regOutlet,
         permissions: rolePerms[regRole] || ['read', 'update_stock'],
-        status: 'active',
+        status: 'pending_approval',
         createdAt: new Date().toISOString(),
       };
 
@@ -436,16 +452,14 @@ export const AdminDashboard = ({
       onUpdateUsers(updatedUsers);
 
       // Audit and notify
-      triggerAudit('USER_REGISTERED', `New ${regRole.toUpperCase()} account created for ${cleanName} (${cleanEmail}) at ${regOutlet}`);
+      triggerAudit('USER_REGISTER_REQUEST', `Staff account access requested by ${cleanName} (${cleanEmail}) for ${regRole.toUpperCase()} at ${regOutlet} - PENDING SUPERUSER APPROVAL`);
 
-      // Auto login newly registered management user
-      const session = createSecureSession(newUser);
-      setCurrentUser(session.user);
+      // Set submission confirmation state - DO NOT auto login! Requires Super Admin approval
+      setRegSubmittedUser(newUser);
       setRegName('');
       setRegEmail('');
       setRegPassword('');
-      setAuthMode('login');
-      showToast(`Account created successfully! Welcome to ROMEE Eatery, ${cleanName}.`);
+      showToast('Registration request submitted! Awaiting Super Administrator approval.');
     } catch (err) {
       console.error(err);
       setRegError('Registration failed. Please try again.');
@@ -1007,6 +1021,39 @@ export const AdminDashboard = ({
     setSecurityThreatAlert(null);
   };
 
+  const handleApproveUser = (userToApprove) => {
+    if (!isSuperuser) return;
+    const updatedUsers = users.map((u) =>
+      u.id === userToApprove.id
+        ? {
+            ...u,
+            status: 'active',
+            approvedAt: new Date().toISOString(),
+            approvedBy: currentUser?.email || 'Super Administrator',
+          }
+        : u
+    );
+    onUpdateUsers(updatedUsers);
+    triggerAudit(
+      'USER_APPROVED',
+      `Super Administrator approved and activated account: ${userToApprove.name} (${userToApprove.email}) as ${userToApprove.role.toUpperCase()}`
+    );
+    showToast(`Staff account for ${userToApprove.name} approved & activated!`);
+  };
+
+  const handleRejectUser = (userToReject) => {
+    if (!isSuperuser) return;
+    if (window.confirm(`Are you sure you want to reject and remove access request for ${userToReject.name} (${userToReject.email})?`)) {
+      const updatedUsers = users.filter((u) => u.id !== userToReject.id);
+      onUpdateUsers(updatedUsers);
+      triggerAudit(
+        'USER_REJECTED',
+        `Super Administrator rejected access request for: ${userToReject.name} (${userToReject.email})`
+      );
+      showToast(`Access request for ${userToReject.name} rejected.`);
+    }
+  };
+
   const handleDeleteUser = (user) => {
     if (user.role === 'superuser') {
       alert('The superuser account cannot be deleted.');
@@ -1190,6 +1237,10 @@ export const AdminDashboard = ({
 
   // ================= 8. PRODUCTION CONFIG EXPORT / IMPORT =================
   const handleDownloadBackupJson = () => {
+    if (!isSuperuser) {
+      showToast('Permission Denied: Only the Super Administrator can export production backup data.');
+      return;
+    }
     const data = exportAllRestaurantData();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1205,6 +1256,10 @@ export const AdminDashboard = ({
   };
 
   const handleImportBackupJson = (e) => {
+    if (!isSuperuser) {
+      showToast('Permission Denied: Only the Super Administrator can restore production backup data.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -1443,117 +1498,179 @@ export const AdminDashboard = ({
                 </form>
               )}
 
-              {/* ---------------- 2. SELF-REGISTRATION FORM ---------------- */}
+              {/* ---------------- 2. SELF-REGISTRATION / ACCESS REQUEST FORM ---------------- */}
               {authMode === 'register' && (
-                <form onSubmit={handleRegisterSubmit} className="space-y-3.5 text-left">
-                  <div>
-                    <label className="block text-slate-300 text-xs font-semibold mb-1">
-                      Full Legal Name
-                    </label>
-                    <input
-                      type="text"
-                      value={regName}
-                      onChange={(e) => setRegName(e.target.value)}
-                      placeholder="e.g. Adebayo Omotayo"
-                      className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 px-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
-                      required
-                    />
-                  </div>
+                regSubmittedUser ? (
+                  <div className="space-y-4 text-center p-4 bg-petrol-900/80 rounded-2xl border border-amber-500/40">
+                    <div className="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-400/50 flex items-center justify-center mx-auto text-mustard shadow-lg">
+                      <Clock className="w-7 h-7" />
+                    </div>
 
-                  <div>
-                    <label className="block text-slate-300 text-xs font-semibold mb-1">
-                      Staff Email Address
-                    </label>
-                    <input
-                      type="email"
-                      value={regEmail}
-                      onChange={(e) => setRegEmail(e.target.value)}
-                      placeholder="e.g. manager@romeeeatery.com.ng"
-                      className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 px-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
-                      required
-                    />
-                  </div>
+                    <h4 className="font-serif font-bold text-lg text-white">
+                      Account Access Request Submitted
+                    </h4>
 
-                  <div>
-                    <label className="block text-slate-300 text-xs font-semibold mb-1">
-                      Choose Password (min 6 characters)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={regPassword}
-                        onChange={(e) => setRegPassword(e.target.value)}
-                        placeholder="Create a strong password"
-                        className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 pl-3 pr-10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
-                        required
-                        minLength={6}
-                      />
+                    <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto">
+                      Your staff access request for <strong className="text-white">{regSubmittedUser.name}</strong> (<span className="text-mustard font-bold uppercase">{regSubmittedUser.role}</span>) has been queued.
+                    </p>
+
+                    <div className="p-3.5 rounded-xl bg-petrol-950 border border-petrol-800 text-left text-xs space-y-1.5">
+                      <p className="text-slate-400">Account Name: <strong className="text-white">{regSubmittedUser.name}</strong></p>
+                      <p className="text-slate-400 font-mono text-[11px]">{regSubmittedUser.email}</p>
+                      <div className="pt-1 flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400">Outlet: {regSubmittedUser.outlet || 'Adebayo Flagship'}</span>
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-mustard border border-amber-500/30 text-[10px] font-bold uppercase">
+                          Pending Super Admin Approval
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      For restaurant security, you cannot sign in until the Super Administrator (<strong>Abdullahi Salami</strong>) reviews and activates your account.
+                    </p>
+
+                    <div className="pt-2 space-y-2">
+                      <a
+                        href={`https://wa.me/2347068371295?text=${encodeURIComponent(
+                          `Hello Super Administrator (Abdullahi Salami),\nI have registered a staff access request on ROMEE Eatery Portal:\n• Name: ${regSubmittedUser.name}\n• Email: ${regSubmittedUser.email}\n• Role: ${regSubmittedUser.role.toUpperCase()}\n• Outlet: ${regSubmittedUser.outlet || 'Adebayo Flagship'}\n\nPlease review and approve my account in your Admin Portal.`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-transform hover:scale-[1.01]"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        <span>Notify Super Admin on WhatsApp (07068371295)</span>
+                      </a>
+
                       <button
                         type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-3 text-slate-400 hover:text-slate-200"
+                        onClick={() => {
+                          setRegSubmittedUser(null);
+                          setAuthMode('login');
+                        }}
+                        className="w-full py-2.5 rounded-xl bg-petrol-950 hover:bg-petrol-800 text-slate-300 hover:text-white font-semibold text-xs border border-petrol-800"
                       >
-                        <Eye className="w-4 h-4" />
+                        Return to Sign In Screen
                       </button>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                ) : (
+                  <form onSubmit={handleRegisterSubmit} className="space-y-3.5 text-left">
                     <div>
                       <label className="block text-slate-300 text-xs font-semibold mb-1">
-                        Management Role
+                        Full Legal Name
                       </label>
-                      <select
-                        value={regRole}
-                        onChange={(e) => setRegRole(e.target.value)}
-                        className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-mustard"
-                      >
-                        <option value="manager">Branch Manager</option>
-                        <option value="chef">Kitchen Head Chef</option>
-                        <option value="cashier">Cashier & Dispatch Lead</option>
-                      </select>
+                      <input
+                        type="text"
+                        value={regName}
+                        onChange={(e) => setRegName(e.target.value)}
+                        placeholder="e.g. Adebayo Omotayo"
+                        className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 px-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
+                        required
+                      />
                     </div>
 
                     <div>
                       <label className="block text-slate-300 text-xs font-semibold mb-1">
-                        Assigned Outlet
+                        Staff Email Address
                       </label>
-                      <select
-                        value={regOutlet}
-                        onChange={(e) => setRegOutlet(e.target.value)}
-                        className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-mustard"
-                      >
-                        <option value="Adebayo Flagship Outlet">Adebayo Flagship (Dine-In)</option>
-                        <option value="Ado-Ekiti Express Dispatch Depot">Ado-Ekiti Express Depot</option>
-                      </select>
+                      <input
+                        type="email"
+                        value={regEmail}
+                        onChange={(e) => setRegEmail(e.target.value)}
+                        placeholder="e.g. manager@romeeeatery.com.ng"
+                        className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 px-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
+                        required
+                      />
                     </div>
-                  </div>
 
-                  {regError && (
-                    <div className="p-3 rounded-xl bg-red-950/80 border border-red-500/40 text-red-300 text-xs flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>{regError}</span>
+                    <div>
+                      <label className="block text-slate-300 text-xs font-semibold mb-1">
+                        Choose Password (min 6 characters)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={regPassword}
+                          onChange={(e) => setRegPassword(e.target.value)}
+                          placeholder="Create a strong password"
+                          className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 pl-3 pr-10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-mustard"
+                          required
+                          minLength={6}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-3 text-slate-400 hover:text-slate-200"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                  )}
 
-                  <button
-                    type="submit"
-                    disabled={isRegistering}
-                    className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg transition-transform hover:scale-[1.01] disabled:opacity-50"
-                  >
-                    {isRegistering ? 'Registering Account...' : 'Complete Registration & Sign In'}
-                  </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-300 text-xs font-semibold mb-1">
+                          Management Role
+                        </label>
+                        <select
+                          value={regRole}
+                          onChange={(e) => setRegRole(e.target.value)}
+                          className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-mustard"
+                        >
+                          <option value="manager">Branch Manager</option>
+                          <option value="chef">Kitchen Head Chef</option>
+                          <option value="cashier">Cashier & Dispatch Lead</option>
+                        </select>
+                      </div>
 
-                  <div className="pt-2 text-center">
+                      <div>
+                        <label className="block text-slate-300 text-xs font-semibold mb-1">
+                          Assigned Outlet
+                        </label>
+                        <select
+                          value={regOutlet}
+                          onChange={(e) => setRegOutlet(e.target.value)}
+                          className="w-full bg-petrol-900 border border-petrol-700 rounded-xl py-2.5 px-3 text-xs text-white focus:outline-none focus:border-mustard"
+                        >
+                          <option value="Adebayo Flagship Outlet">Adebayo Flagship (Dine-In)</option>
+                          <option value="Ado-Ekiti Express Dispatch Depot">Ado-Ekiti Express Depot</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Security Notice on Registration */}
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-300 flex items-start gap-2">
+                      <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-mustard" />
+                      <span>Security Approval Required: Submitting this form creates a pending request. You will not be able to log in until your account is approved and activated by Super Administrator Abdullahi Salami.</span>
+                    </div>
+
+                    {regError && (
+                      <div className="p-3 rounded-xl bg-red-950/80 border border-red-500/40 text-red-300 text-xs flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>{regError}</span>
+                      </div>
+                    )}
+
                     <button
-                      type="button"
-                      onClick={() => setAuthMode('login')}
-                      className="text-xs text-slate-400 hover:text-mustard hover:underline"
+                      type="submit"
+                      disabled={isRegistering}
+                      className="w-full py-3 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold text-xs uppercase tracking-wider shadow-lg transition-transform hover:scale-[1.01] disabled:opacity-50"
                     >
-                      Already have an account? Return to Sign In
+                      {isRegistering ? 'Submitting Request...' : 'Submit Account for Approval'}
                     </button>
-                  </div>
-                </form>
+
+                    <div className="pt-2 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setAuthMode('login')}
+                        className="text-xs text-slate-400 hover:text-mustard hover:underline"
+                      >
+                        Already registered? Return to Sign In
+                      </button>
+                    </div>
+                  </form>
+                )
               )}
 
               {/* ---------------- 3. FORGOT PASSWORD WORKFLOW ---------------- */}
@@ -1760,20 +1877,27 @@ export const AdminDashboard = ({
                   >
                     <UserCheck className="w-4 h-4" />
                     <span>User Roles ({users.length})</span>
+                    {pendingUsers.length > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-black animate-pulse">
+                        {pendingUsers.length}
+                      </span>
+                    )}
                   </button>
                 )}
 
-                <button
-                  onClick={() => setActiveTab('audit')}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
-                    activeTab === 'audit'
-                      ? 'bg-mustard text-petrol-950 shadow-md'
-                      : 'text-slate-300 hover:text-white hover:bg-petrol-800'
-                  }`}
-                >
-                  <Clock className="w-4 h-4" />
-                  <span>Audit Trail ({auditLogs.length})</span>
-                </button>
+                {isSuperuser && (
+                  <button
+                    onClick={() => setActiveTab('audit')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                      activeTab === 'audit'
+                        ? 'bg-mustard text-petrol-950 shadow-md'
+                        : 'text-slate-300 hover:text-white hover:bg-petrol-800'
+                    }`}
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>Audit Trail ({auditLogs.length})</span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => setActiveTab('pricing')}
@@ -1797,7 +1921,7 @@ export const AdminDashboard = ({
                 >
                   <Settings className="w-4 h-4" />
                   <span>Production Settings</span>
-                  {isCloudReady && (
+                  {isSuperuser && isCloudReady && (
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Cloud Database Connected"></span>
                   )}
                 </button>
@@ -2153,6 +2277,68 @@ export const AdminDashboard = ({
                     </button>
                   </div>
 
+                  {/* PENDING ACCOUNT APPROVALS QUEUE (Super Admin Only) */}
+                  {pendingUsers.length > 0 && (
+                    <div className="bg-amber-950/40 border border-amber-500/50 rounded-2xl p-5 space-y-4 shadow-xl">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2 text-mustard">
+                          <ShieldAlert className="w-5 h-5 text-mustard animate-bounce" />
+                          <h4 className="font-serif font-bold text-base text-white">
+                            Staff Account Approvals Required ({pendingUsers.length})
+                          </h4>
+                        </div>
+                        <span className="px-3 py-1 rounded-full bg-amber-500/20 text-mustard border border-amber-500/40 text-[10px] font-black uppercase tracking-wider">
+                          Requires Super Admin Authorization
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        The following users requested management access on the portal. They are currently locked out and cannot sign in until you approve them:
+                      </p>
+
+                      <div className="space-y-3">
+                        {pendingUsers.map((pu) => (
+                          <div 
+                            key={pu.id} 
+                            className="p-4 rounded-xl bg-petrol-900/90 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-white text-sm">{pu.name}</span>
+                                <span className="px-2 py-0.5 rounded-md bg-mustard text-petrol-950 font-bold text-[10px] uppercase">
+                                  {pu.role}
+                                </span>
+                                <span className="text-[10px] text-slate-400">({pu.title || 'Staff Member'})</span>
+                              </div>
+                              <p className="text-xs text-slate-300 font-mono">{pu.email}</p>
+                              <p className="text-[11px] text-slate-400">
+                                Assigned Outlet: <strong className="text-slate-200">{pu.outlet || 'Adebayo Flagship Outlet'}</strong> • Registered: {pu.createdAt ? new Date(pu.createdAt).toLocaleString() : 'Recent'}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2.5 shrink-0">
+                              <button
+                                onClick={() => handleApproveUser(pu)}
+                                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md transition-all hover:scale-105"
+                                title="Authorize user to sign in and access their role"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                                <span>Approve & Activate</span>
+                              </button>
+                              <button
+                                onClick={() => handleRejectUser(pu)}
+                                className="px-3.5 py-2 rounded-xl bg-red-950/80 hover:bg-red-900 text-red-300 border border-red-800 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all"
+                                title="Reject and remove this registration request"
+                              >
+                                <X className="w-4 h-4" />
+                                <span>Reject Request</span>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Users Table */}
                   <div className="bg-petrol-950/80 rounded-2xl border border-petrol-800 overflow-hidden">
                     <table className="w-full text-left text-xs">
@@ -2197,37 +2383,64 @@ export const AdminDashboard = ({
                             </td>
                             <td className="p-3.5">
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                u.status === 'active' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-red-950 text-red-400 border border-red-800'
+                                u.status === 'active' 
+                                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' 
+                                  : u.status === 'pending_approval'
+                                  ? 'bg-amber-950 text-amber-300 border border-amber-500 animate-pulse'
+                                  : 'bg-red-950 text-red-400 border border-red-800'
                               }`}>
-                                {u.status}
+                                {u.status === 'pending_approval' ? 'Pending Approval' : u.status}
                               </span>
                             </td>
                             <td className="p-3.5 text-right">
                               <div className="flex items-center justify-end gap-2.5">
-                                <button
-                                  onClick={() => {
-                                    setTargetUserForReset(u);
-                                    setAdminNewUserPassword('');
-                                  }}
-                                  className="text-slate-300 hover:text-white hover:underline text-[11px] font-bold flex items-center gap-1"
-                                  title="Set new password for this user"
-                                >
-                                  <Key className="w-3 h-3 text-mustard" />
-                                  <span>Reset PIN</span>
-                                </button>
-                                <button
-                                  onClick={() => handleOpenEditUser(u)}
-                                  className="text-mustard hover:underline text-[11px] font-bold"
-                                >
-                                  Edit
-                                </button>
-                                {u.role !== 'superuser' && (
-                                  <button
-                                    onClick={() => handleDeleteUser(u)}
-                                    className="text-red-400 hover:underline text-[11px] font-bold"
-                                  >
-                                    Revoke
-                                  </button>
+                                {u.status === 'pending_approval' ? (
+                                  <>
+                                    <button
+                                      onClick={() => handleApproveUser(u)}
+                                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm"
+                                      title="Approve & activate this staff account"
+                                    >
+                                      <CheckCircle2 className="w-3 h-3" />
+                                      <span>Approve</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handleRejectUser(u)}
+                                      className="px-2.5 py-1 rounded-lg bg-red-950 hover:bg-red-900 text-red-300 border border-red-800 text-[11px] font-bold flex items-center gap-1"
+                                      title="Reject & remove request"
+                                    >
+                                      <X className="w-3 h-3" />
+                                      <span>Reject</span>
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setTargetUserForReset(u);
+                                        setAdminNewUserPassword('');
+                                      }}
+                                      className="text-slate-300 hover:text-white hover:underline text-[11px] font-bold flex items-center gap-1"
+                                      title="Set new password for this user"
+                                    >
+                                      <Key className="w-3 h-3 text-mustard" />
+                                      <span>Reset PIN</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handleOpenEditUser(u)}
+                                      className="text-mustard hover:underline text-[11px] font-bold"
+                                    >
+                                      Edit
+                                    </button>
+                                    {u.role !== 'superuser' && (
+                                      <button
+                                        onClick={() => handleDeleteUser(u)}
+                                        className="text-red-400 hover:underline text-[11px] font-bold"
+                                      >
+                                        Revoke
+                                      </button>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </td>
@@ -2316,8 +2529,8 @@ export const AdminDashboard = ({
                 </div>
               )}
 
-              {/* TAB 5: AUDIT TRAIL */}
-              {activeTab === 'audit' && (
+              {/* TAB 5: AUDIT TRAIL (Super Admin Only) */}
+              {activeTab === 'audit' && isSuperuser && (
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-petrol-950/70 p-4 rounded-2xl border border-petrol-800">
                     <div>
@@ -2809,11 +3022,18 @@ export const AdminDashboard = ({
                           <label className="block text-slate-300 font-semibold mb-1">Superuser Alert Email</label>
                           <input
                             type="email"
+                            disabled={!isSuperuser}
                             value={settingsForm.superuserEmail || 'salamiabdullahi247@gmail.com'}
                             onChange={(e) => setSettingsForm({ ...settingsForm, superuserEmail: e.target.value })}
-                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-mustard"
+                            className={`w-full bg-petrol-900 border rounded-xl p-2.5 text-white focus:outline-none ${
+                              isSuperuser ? 'border-petrol-700 focus:border-mustard' : 'border-petrol-800 opacity-60 cursor-not-allowed'
+                            }`}
                           />
-                          <p className="text-[10px] text-slate-400 mt-1">Audit log reports and security threat alerts will be routed here.</p>
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            {isSuperuser
+                              ? 'Audit log reports and security threat alerts will be routed here.'
+                              : 'Superuser primary security alert email (Locked - Super Admin only).'}
+                          </p>
                         </div>
 
                         <div>
@@ -2907,212 +3127,217 @@ export const AdminDashboard = ({
 
                   </form>
 
-                  {/* Production Deployment & Data Backup Tools */}
-                  <div className="bg-petrol-950/70 p-6 rounded-2xl border border-mustard/30 space-y-4">
-                    <div className="flex items-center gap-2 text-mustard">
-                      <Download className="w-5 h-5" />
-                      <h3 className="font-serif font-bold text-base text-white">Production Data Backup & Multi-Device Sync</h3>
-                    </div>
+                  {/* SUPERUSER ONLY SECTIONS: Backup Download/Restore, Cloud Sync & Factory Reset */}
+                  {isSuperuser && (
+                    <>
+                      {/* Production Deployment & Data Backup Tools */}
+                      <div className="bg-petrol-950/70 p-6 rounded-2xl border border-mustard/30 space-y-4">
+                        <div className="flex items-center gap-2 text-mustard">
+                          <Download className="w-5 h-5" />
+                          <h3 className="font-serif font-bold text-base text-white">Production Data Backup & Multi-Device Sync</h3>
+                        </div>
 
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      Download your entire customized restaurant configuration (dishes, prices, staff, media, settings) as a verified JSON file, or restore it on any other phone, tablet, or browser.
-                    </p>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Download your entire customized restaurant configuration (dishes, prices, staff, media, settings) as a verified JSON file, or restore it on any other phone, tablet, or browser.
+                        </p>
 
-                    <div className="flex flex-wrap items-center gap-3 pt-2">
-                      <button
-                        onClick={handleDownloadBackupJson}
-                        className="px-4 py-2.5 rounded-xl bg-petrol-900 hover:bg-petrol-800 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 border border-petrol-700 shadow-sm"
-                      >
-                        <Download className="w-4 h-4 text-mustard" />
-                        <span>Download Production Backup (.json)</span>
-                      </button>
+                        <div className="flex flex-wrap items-center gap-3 pt-2">
+                          <button
+                            onClick={handleDownloadBackupJson}
+                            className="px-4 py-2.5 rounded-xl bg-petrol-900 hover:bg-petrol-800 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 border border-petrol-700 shadow-sm"
+                          >
+                            <Download className="w-4 h-4 text-mustard" />
+                            <span>Download Production Backup (.json)</span>
+                          </button>
 
-                      <label className="px-4 py-2.5 rounded-xl bg-petrol-900 hover:bg-petrol-800 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 border border-petrol-700 shadow-sm cursor-pointer">
-                        <Upload className="w-4 h-4 text-emerald-400" />
-                        <span>Restore Data from Backup</span>
-                        <input
-                          type="file"
-                          accept=".json"
-                          onChange={handleImportBackupJson}
-                          className="hidden"
-                        />
-                      </label>
+                          <label className="px-4 py-2.5 rounded-xl bg-petrol-900 hover:bg-petrol-800 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 border border-petrol-700 shadow-sm cursor-pointer">
+                            <Upload className="w-4 h-4 text-emerald-400" />
+                            <span>Restore Data from Backup</span>
+                            <input
+                              type="file"
+                              accept=".json"
+                              onChange={handleImportBackupJson}
+                              className="hidden"
+                            />
+                          </label>
 
-                      <button
-                        onClick={() => setShowCodeExportModal(true)}
-                        className="px-4 py-2.5 rounded-xl bg-petrol-900 hover:bg-petrol-800 text-mustard font-bold text-xs uppercase tracking-wider flex items-center gap-2 border border-mustard/40 shadow-sm"
-                      >
-                        <FileText className="w-4 h-4" />
-                        <span>Export Live Code Snippet</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Central Cloud Database Connection (Firebase Firestore) */}
-                  <div id="cloud-credentials-setup" className="bg-petrol-950/70 p-6 rounded-2xl border border-petrol-800 space-y-4">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2 text-mustard">
-                        <Database className="w-5 h-5" />
-                        <h4 className="font-serif font-bold text-base text-white">
-                          Central Cloud Database Sync (Google Firebase Firestore)
-                        </h4>
-                        {isCloudReady ? (
-                          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
-                            ✓ Live Connected
-                          </span>
-                        ) : (
-                          <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
-                            Local Storage Mode
-                          </span>
-                        )}
+                          <button
+                            onClick={() => setShowCodeExportModal(true)}
+                            className="px-4 py-2.5 rounded-xl bg-petrol-900 hover:bg-petrol-800 text-mustard font-bold text-xs uppercase tracking-wider flex items-center gap-2 border border-mustard/40 shadow-sm"
+                          >
+                            <FileText className="w-4 h-4" />
+                            <span>Export Live Code Snippet</span>
+                          </button>
+                        </div>
                       </div>
 
-                      {isCloudReady && (
+                      {/* Central Cloud Database Connection (Firebase Firestore) */}
+                      <div id="cloud-credentials-setup" className="bg-petrol-950/70 p-6 rounded-2xl border border-petrol-800 space-y-4">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2 text-mustard">
+                            <Database className="w-5 h-5" />
+                            <h4 className="font-serif font-bold text-base text-white">
+                              Central Cloud Database Sync (Google Firebase Firestore)
+                            </h4>
+                            {isCloudReady ? (
+                              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                                ✓ Live Connected
+                              </span>
+                            ) : (
+                              <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                                Local Storage Mode
+                              </span>
+                            )}
+                          </div>
+
+                          {isCloudReady && (
+                            <button
+                              type="button"
+                              onClick={handleClearCloudCredentials}
+                              className="text-xs text-red-400 hover:text-red-300 hover:underline"
+                            >
+                              Disconnect Credentials
+                            </button>
+                          )}
+                        </div>
+
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          Connect your 100% free Google Firebase Cloud Firestore database to enable permanent, automatic real-time sync across all phones, tablets, and computers. Any menu changes, price updates, or orders made on any device reflect globally without any manual push or pull buttons.
+                        </p>
+
+                        <form onSubmit={handleSaveFirebaseConfig} className="space-y-4 text-xs">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">
+                                Firebase API Key <span className="text-red-400">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={firebaseConfigForm.apiKey || ''}
+                                onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, apiKey: e.target.value.trim() })}
+                                placeholder="AIzaSy..."
+                                className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
+                                required
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">
+                                Firebase Project ID <span className="text-red-400">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={firebaseConfigForm.projectId || ''}
+                                onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, projectId: e.target.value.trim() })}
+                                placeholder="romee-eatery-XXXXX"
+                                className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
+                                required
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">
+                                Auth Domain (Optional)
+                              </label>
+                              <input
+                                type="text"
+                                value={firebaseConfigForm.authDomain || ''}
+                                onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, authDomain: e.target.value.trim() })}
+                                placeholder="romee-eatery.firebaseapp.com"
+                                className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">
+                                Storage Bucket (Optional)
+                              </label>
+                              <input
+                                type="text"
+                                value={firebaseConfigForm.storageBucket || ''}
+                                onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, storageBucket: e.target.value.trim() })}
+                                placeholder="romee-eatery.appspot.com"
+                                className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">
+                                Messaging Sender ID (Optional)
+                              </label>
+                              <input
+                                type="text"
+                                value={firebaseConfigForm.messagingSenderId || ''}
+                                onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, messagingSenderId: e.target.value.trim() })}
+                                placeholder="104928374619"
+                                className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-slate-300 font-semibold mb-1">
+                                App ID (Optional)
+                              </label>
+                              <input
+                                type="text"
+                                value={firebaseConfigForm.appId || ''}
+                                onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, appId: e.target.value.trim() })}
+                                placeholder="1:104928374619:web:abcdef"
+                                className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-petrol-800">
+                            <span className="text-[11px] text-slate-400">
+                              {isCloudReady ? '✓ Connection active — auto-syncing in background' : 'Free tier: 1 GB storage & 50,000 reads/day'}
+                            </span>
+
+                            <button
+                              type="submit"
+                              className="px-6 py-2.5 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold text-xs uppercase tracking-wider shadow-md transition-transform hover:scale-105"
+                            >
+                              Save & Connect Central Database
+                            </button>
+                          </div>
+                        </form>
+
+                        {/* Quick Step-by-Step Instructions */}
+                        <div className="p-4 rounded-xl bg-petrol-900/60 border border-petrol-800 space-y-2 text-xs text-slate-300">
+                          <span className="font-bold text-mustard block">
+                            How to create your free Firebase database in 3 steps:
+                          </span>
+                          <ol className="list-decimal pl-4 space-y-1 text-[11px] text-slate-400">
+                            <li>Visit <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" className="text-mustard underline font-bold">console.firebase.google.com</a> and click <strong>Create a project</strong> (e.g. <em>romee-eatery</em>).</li>
+                            <li>In the left sidebar, click <strong>Build &rarr; Firestore Database</strong> &rarr; click <strong>Create database</strong> (choose "Start in test mode").</li>
+                            <li>Click <strong>Project Settings (gear icon) &rarr; General &rarr; Your apps</strong>, select Web <code>&lt;/&gt;</code>, and paste the values into the fields above.</li>
+                          </ol>
+                        </div>
+                      </div>
+
+                      {/* Factory Reset */}
+                      <div className="bg-red-950/30 p-6 rounded-2xl border border-red-900/40 flex items-center justify-between gap-4">
+                        <div>
+                          <h4 className="font-serif font-bold text-sm text-red-300">Reset System to Defaults</h4>
+                          <p className="text-xs text-slate-400">Restores all original menu items, default staff, and baseline settings.</p>
+                        </div>
+
                         <button
                           type="button"
-                          onClick={handleClearCloudCredentials}
-                          className="text-xs text-red-400 hover:text-red-300 hover:underline"
+                          onClick={() => {
+                            if (window.confirm('WARNING: Reset all menu items, staff profiles, and settings back to factory defaults?')) {
+                              onResetDefaults();
+                              onClose();
+                            }
+                          }}
+                          className="px-4 py-2 rounded-xl bg-red-950 hover:bg-red-900 text-red-300 font-bold text-xs uppercase tracking-wider border border-red-800 flex items-center gap-1.5 shrink-0"
                         >
-                          Disconnect Credentials
-                        </button>
-                      )}
-                    </div>
-
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      Connect your 100% free Google Firebase Cloud Firestore database to enable permanent, automatic real-time sync across all phones, tablets, and computers. Any menu changes, price updates, or orders made on any device reflect globally without any manual push or pull buttons.
-                    </p>
-
-                    <form onSubmit={handleSaveFirebaseConfig} className="space-y-4 text-xs">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-slate-300 font-semibold mb-1">
-                            Firebase API Key <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={firebaseConfigForm.apiKey || ''}
-                            onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, apiKey: e.target.value.trim() })}
-                            placeholder="AIzaSy..."
-                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
-                            required
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-300 font-semibold mb-1">
-                            Firebase Project ID <span className="text-red-400">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={firebaseConfigForm.projectId || ''}
-                            onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, projectId: e.target.value.trim() })}
-                            placeholder="romee-eatery-XXXXX"
-                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
-                            required
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-300 font-semibold mb-1">
-                            Auth Domain (Optional)
-                          </label>
-                          <input
-                            type="text"
-                            value={firebaseConfigForm.authDomain || ''}
-                            onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, authDomain: e.target.value.trim() })}
-                            placeholder="romee-eatery.firebaseapp.com"
-                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-300 font-semibold mb-1">
-                            Storage Bucket (Optional)
-                          </label>
-                          <input
-                            type="text"
-                            value={firebaseConfigForm.storageBucket || ''}
-                            onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, storageBucket: e.target.value.trim() })}
-                            placeholder="romee-eatery.appspot.com"
-                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-300 font-semibold mb-1">
-                            Messaging Sender ID (Optional)
-                          </label>
-                          <input
-                            type="text"
-                            value={firebaseConfigForm.messagingSenderId || ''}
-                            onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, messagingSenderId: e.target.value.trim() })}
-                            placeholder="104928374619"
-                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-300 font-semibold mb-1">
-                            App ID (Optional)
-                          </label>
-                          <input
-                            type="text"
-                            value={firebaseConfigForm.appId || ''}
-                            onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, appId: e.target.value.trim() })}
-                            placeholder="1:104928374619:web:abcdef"
-                            className="w-full bg-petrol-900 border border-petrol-700 rounded-xl p-2.5 text-white font-mono focus:outline-none focus:border-mustard"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-petrol-800">
-                        <span className="text-[11px] text-slate-400">
-                          {isCloudReady ? '✓ Connection active — auto-syncing in background' : 'Free tier: 1 GB storage & 50,000 reads/day'}
-                        </span>
-
-                        <button
-                          type="submit"
-                          className="px-6 py-2.5 rounded-xl bg-mustard hover:bg-mustard-hover text-petrol-950 font-bold text-xs uppercase tracking-wider shadow-md transition-transform hover:scale-105"
-                        >
-                          Save & Connect Central Database
+                          <RefreshCcw className="w-3.5 h-3.5" />
+                          <span>Factory Reset</span>
                         </button>
                       </div>
-                    </form>
-
-                    {/* Quick Step-by-Step Instructions */}
-                    <div className="p-4 rounded-xl bg-petrol-900/60 border border-petrol-800 space-y-2 text-xs text-slate-300">
-                      <span className="font-bold text-mustard block">
-                        How to create your free Firebase database in 3 steps:
-                      </span>
-                      <ol className="list-decimal pl-4 space-y-1 text-[11px] text-slate-400">
-                        <li>Visit <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" className="text-mustard underline font-bold">console.firebase.google.com</a> and click <strong>Create a project</strong> (e.g. <em>romee-eatery</em>).</li>
-                        <li>In the left sidebar, click <strong>Build &rarr; Firestore Database</strong> &rarr; click <strong>Create database</strong> (choose "Start in test mode").</li>
-                        <li>Click <strong>Project Settings (gear icon) &rarr; General &rarr; Your apps</strong>, select Web <code>&lt;/&gt;</code>, and paste the values into the fields above.</li>
-                      </ol>
-                    </div>
-                  </div>
-
-                  {/* Factory Reset */}
-                  <div className="bg-red-950/30 p-6 rounded-2xl border border-red-900/40 flex items-center justify-between gap-4">
-                    <div>
-                      <h4 className="font-serif font-bold text-sm text-red-300">Reset System to Defaults</h4>
-                      <p className="text-xs text-slate-400">Restores all original menu items, default staff, and baseline settings.</p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (window.confirm('WARNING: Reset all menu items, staff profiles, and settings back to factory defaults?')) {
-                          onResetDefaults();
-                          onClose();
-                        }
-                      }}
-                      className="px-4 py-2 rounded-xl bg-red-950 hover:bg-red-900 text-red-300 font-bold text-xs uppercase tracking-wider border border-red-800 flex items-center gap-1.5 shrink-0"
-                    >
-                      <RefreshCcw className="w-3.5 h-3.5" />
-                      <span>Factory Reset</span>
-                    </button>
-                  </div>
+                    </>
+                  )}
 
                 </div>
               )}
